@@ -9,11 +9,12 @@ Descarga el instalador de la [última versión](https://github.com/ibrarmz/dynam
 | Sistema | Archivo | Notas |
 | --- | --- | --- |
 | Windows 10/11 | `DynamicIsland_<versión>_x64-setup.exe` | Recomendado. Instala por usuario, sin permisos de administrador. |
+| Windows 10/11 | `DynamicIsland_<versión>_x64-portable.zip` | Si tu red bloquea descargas de `.exe`/`.msi`. Descomprime y abre `dynamic-island.exe`; no instala ni pide administrador. Instrucciones en `LEEME.txt`. |
 | Windows 10/11 | `DynamicIsland_<versión>_x64.msi` | Para todo el equipo, en Program Files. Pide administrador; útil para desplegar con Intune / GPO (`msiexec /i … /qn`). |
 | Debian / Ubuntu | `dynamic-island_<versión>_amd64.deb` | `sudo apt install ./dynamic-island_<versión>_amd64.deb` |
 | Fedora | `dynamic-island-<versión>-1.x86_64.rpm` | `sudo dnf install ./dynamic-island-<versión>-1.x86_64.rpm` |
 
-Usa uno de los dos de Windows, no ambos. Los dos, al desinstalar, quitan los hooks de Claude y el inicio automático (`dynamic-island uninstall-cleanup`). No están firmados: si SmartScreen avisa, "Más información" → "Ejecutar de todas formas".
+Usa solo una de las opciones de Windows. Los dos, al desinstalar, quitan los hooks de Claude y el inicio automático (`dynamic-island uninstall-cleanup`). No están firmados: si SmartScreen avisa, "Más información" → "Ejecutar de todas formas".
 
 En Linux, antes de desinstalar, corre `dynamic-island hooks uninstall` si conectaste Claude Code y apaga "Iniciar con el sistema" en Ajustes: el paquete se desinstala como root y no puede tocar la configuración de tu usuario.
 

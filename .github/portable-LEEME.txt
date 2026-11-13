@@ -1,0 +1,27 @@
+Dynamic Island {{VERSION}} - versión portable para Windows 10/11
+=================================================================
+
+No necesita instalarse ni permisos de administrador.
+
+1. Descomprime esta carpeta donde quieras que viva la app, por ejemplo
+   Documentos\Dynamic Island. Si después la mueves, vuelve a abrirla desde
+   el lugar nuevo.
+2. Abre dynamic-island.exe. Si Windows avisa (SmartScreen):
+   "Más información" -> "Ejecutar de todas formas".
+3. La isla aparece arriba de la pantalla. Para que arranque sola:
+   Ajustes (engrane) -> "Iniciar con el sistema".
+
+Deja dynamic-island.exe e island-hook.exe juntos en la misma carpeta:
+island-hook.exe es el que usa Claude Code para avisarle a la isla.
+
+Para quitarla:
+  1. Cierra la isla (icono de la bandeja -> Salir).
+  2. Abre una terminal en esta carpeta y ejecuta:
+         dynamic-island.exe uninstall-cleanup
+     (quita los hooks de Claude Code y el inicio automático).
+  3. Borra la carpeta.
+
+Tus notas y ajustes viven en %APPDATA%\dev.dynamicisland.island
+(bórrala también si no quieres conservarlos).
+
+Requiere WebView2, que ya viene con Windows 11 y con Windows 10 actualizado.
