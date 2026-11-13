@@ -1,0 +1,60 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Dynamic Island",
+  "mainBinaryName": "dynamic-island",
+  "version": "0.1.0",
+  "identifier": "dev.dynamicisland.island",
+  "build": {
+    "beforeDevCommand": "npm run build:hook && npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build:hook && npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "island",
+        "title": "Dynamic Island",
+        "width": 760,
+        "height": 330,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "shadow": false,
+        "visible": false,
+        "focus": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,CalculateNativeWinOcclusion --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling --disable-gpu --disable-gpu-compositing --renderer-process-limit=1 --disable-extensions --disable-component-update --disable-background-networking --disable-sync --no-first-run --disable-breakpad --js-flags=--lite-mode --enable-features=NetworkServiceInProcess"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "deb", "rpm"],
+    "publisher": "Dynamic Island",
+    "category": "Utility",
+    "shortDescription": "Una isla dinámica para tu escritorio",
+    "longDescription": "Isla dinámica para Windows y Linux: música, Claude Code, focus, notas y sistema, siempre a mano arriba de la pantalla.",
+    "externalBin": ["binaries/island-hook"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["Spanish"],
+        "installerHooks": "windows/hooks.nsh"
+      }
+    }
+  }
+}

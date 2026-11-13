@@ -1,0 +1,155 @@
+//! User settings, stored as settings.json in the app's config folder.
+//! The UI sends partial updates; they are merged, validated, saved and
+//! broadcast as a `settings` event so every part of the app stays in sync.
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{fs, path::PathBuf, sync::Mutex};
+use tauri::{AppHandle, Emitter, Manager, State};
+
+pub const TABS: [&str; 5] = ["claude", "music", "focus", "notes", "sys"];
+
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[serde(default)]
+pub struct Settings {
+    /// "left" | "center" | "right"
+    pub position: String,
+    /// ms the cursor must rest on the island to open it: idle / something active.
+    pub dwell_idle: u32,
+    pub dwell_busy: u32,
+    /// Fade the island when the cursor is just passing over it.
+    pub ghost: bool,
+    /// Tuck the island away behind maximized / fullscreen windows.
+    pub hide_when_covered: bool,
+    pub focus_mins: u32,
+    pub break_mins: u32,
+    /// Dock sections shown (Inicio and Configuración are always there).
+    pub tabs: Vec<String>,
+    /// Open by itself when Claude asks for permission.
+    pub claude_peek: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            position: "center".into(),
+            dwell_idle: 400,
+            dwell_busy: 600,
+            ghost: true,
+            hide_when_covered: true,
+            focus_mins: 25,
+            break_mins: 5,
+            tabs: TABS.iter().map(|s| s.to_string()).collect(),
+            claude_peek: true,
+        }
+    }
+}
+
+impl Settings {
+    fn sanitize(mut self) -> Self {
+        if !matches!(self.position.as_str(), "left" | "center" | "right") {
+            self.position = "center".into();
+        }
+        self.dwell_idle = self.dwell_idle.clamp(0, 2000);
+        self.dwell_busy = self.dwell_busy.clamp(0, 2000);
+        self.focus_mins = self.focus_mins.clamp(1, 60);
+        self.break_mins = self.break_mins.clamp(1, 60);
+        self.tabs.retain(|t| TABS.contains(&t.as_str()));
+        self.tabs.dedup();
+        self
+    }
+}
+
+pub struct SettingsState {
+    pub current: Mutex<Settings>,
+    path: Mutex<Option<PathBuf>>,
+}
+
+impl Default for SettingsState {
+    fn default() -> Self {
+        Self { current: Mutex::new(Settings::default()), path: Mutex::new(None) }
+    }
+}
+
+/// Snapshot of the current settings from anywhere in the core.
+pub fn get(app: &AppHandle) -> Settings {
+    app.state::<SettingsState>().current.lock().unwrap().clone()
+}
+
+pub fn load(app: &AppHandle) {
+    let Ok(dir) = app.path().app_config_dir() else { return };
+    let path = dir.join("settings.json");
+    let loaded = fs::read_to_string(&path)
+        .ok()
+        .and_then(|t| serde_json::from_str::<Settings>(&t).ok())
+        .unwrap_or_default()
+        .sanitize();
+    let state = app.state::<SettingsState>();
+    *state.current.lock().unwrap() = loaded;
+    *state.path.lock().unwrap() = Some(path);
+}
+
+fn save(state: &SettingsState, s: &Settings) -> Result<(), String> {
+    let Some(path) = state.path.lock().unwrap().clone() else {
+        return Err("sin carpeta de configuración".into());
+    };
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, serde_json::to_string_pretty(s).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &path).map_err(|e| e.to_string())
+}
+
+/// Merge `patch` into the current settings, save, apply and broadcast.
+pub fn update(app: &AppHandle, patch: Value) -> Result<Settings, String> {
+    let state = app.state::<SettingsState>();
+    let (before, after) = {
+        let mut cur = state.current.lock().unwrap();
+        let mut merged = serde_json::to_value(&*cur).map_err(|e| e.to_string())?;
+        if let (Some(obj), Some(p)) = (merged.as_object_mut(), patch.as_object()) {
+            for (k, v) in p {
+                obj.insert(k.clone(), v.clone());
+            }
+        }
+        let next: Settings = serde_json::from_value::<Settings>(merged).map_err(|e| e.to_string())?.sanitize();
+        let before = std::mem::replace(&mut *cur, next.clone());
+        (before, next)
+    };
+    if before != after {
+        save(&state, &after)?;
+        if before.position != after.position {
+            if let Some(win) = app.get_webview_window("island") {
+                crate::hit::place_window(&win);
+            }
+        }
+        if before.focus_mins != after.focus_mins || before.break_mins != after.break_mins {
+            crate::focus::apply_defaults(app, after.focus_mins, after.break_mins);
+        }
+        let _ = app.emit("settings", after.clone());
+    }
+    Ok(after)
+}
+
+#[tauri::command]
+pub fn settings_get(state: State<SettingsState>) -> Settings {
+    state.current.lock().unwrap().clone()
+}
+
+#[tauri::command]
+pub fn settings_set(app: AppHandle, patch: Value) -> Result<Settings, String> {
+    update(&app, patch)
+}
+
+/// Start with the system (registry Run key on Windows, ~/.config/autostart on Linux).
+#[tauri::command]
+pub fn autostart(app: AppHandle, enable: Option<bool>) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let launcher = app.autolaunch();
+    match enable {
+        Some(true) => launcher.enable().map_err(|e| e.to_string())?,
+        Some(false) => launcher.disable().map_err(|e| e.to_string())?,
+        None => {}
+    }
+    launcher.is_enabled().map_err(|e| e.to_string())
+}

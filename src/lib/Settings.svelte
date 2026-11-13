@@ -1,0 +1,195 @@
+<script>
+  import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { settings, setSettings, claude, claudeCmd } from './store.svelte.js';
+  import { icon } from './icons.js';
+
+  const SECTIONS = [
+    { id: 'claude', label: 'Claude' },
+    { id: 'music', label: 'Música' },
+    { id: 'focus', label: 'Focus' },
+    { id: 'notes', label: 'Notas' },
+    { id: 'sys', label: 'Sistema' },
+  ];
+  const POSITIONS = [
+    { id: 'left', label: 'Izquierda' },
+    { id: 'center', label: 'Centro' },
+    { id: 'right', label: 'Derecha' },
+  ];
+
+  let autostart = $state(null);
+  let busy = $state('');
+  let error = $state('');
+
+  onMount(() => {
+    invoke('autostart').then((v) => (autostart = v)).catch(() => (autostart = null));
+  });
+
+  async function run(key, fn) {
+    busy = key;
+    error = '';
+    try {
+      await fn();
+    } catch (e) {
+      error = String(e);
+    } finally {
+      busy = '';
+    }
+  }
+
+  const toggleAutostart = () =>
+    run('autostart', async () => (autostart = await invoke('autostart', { enable: !autostart })));
+
+  const set = (patch) => run('settings', () => setSettings(patch));
+
+  function step(key, delta, min, max) {
+    set({ [key]: Math.max(min, Math.min(max, settings[key] + delta)) });
+  }
+
+  function toggleSection(id) {
+    const on = settings.tabs.includes(id);
+    // Keep the original order when turning a section back on.
+    const tabs = SECTIONS.map((s) => s.id).filter((s) => (s === id ? !on : settings.tabs.includes(s)));
+    set({ tabs });
+  }
+</script>
+
+{#snippet toggle(on, label, onclick, disabled = false)}
+  <button class="switch" class:on role="switch" aria-checked={!!on} aria-label={label} {disabled} {onclick}><i></i></button>
+{/snippet}
+
+{#snippet stepper(key, delta, min, max, unit, label)}
+  <span class="stepper" role="group" aria-label={label}>
+    <button aria-label="Menos" onclick={() => step(key, -delta, min, max)} disabled={settings[key] <= min}>{@html icon('minus', 14, 2)}</button>
+    <span class="num">{settings[key]}{unit}</span>
+    <button aria-label="Más" onclick={() => step(key, delta, min, max)} disabled={settings[key] >= max}>{@html icon('plus', 14, 2)}</button>
+  </span>
+{/snippet}
+
+<div class="settings">
+  <div class="col">
+    <section>
+      <h3 class="label">GENERAL</h3>
+      <div class="row">
+        <span>Iniciar con el sistema</span>
+        {#if autostart === null}<span class="dim">No disponible</span>{:else}{@render toggle(autostart, 'Iniciar con el sistema', toggleAutostart, busy === 'autostart')}{/if}
+      </div>
+      <div class="row">
+        <span>Posición</span>
+        <span class="seg" role="group" aria-label="Posición de la isla">
+          {#each POSITIONS as p}
+            <button class:on={settings.position === p.id} aria-pressed={settings.position === p.id} onclick={() => set({ position: p.id })}>{p.label}</button>
+          {/each}
+        </span>
+      </div>
+    </section>
+
+    <section>
+      <h3 class="label">AL PASAR EL CURSOR</h3>
+      <div class="row"><span>Abrir tras</span>{@render stepper('dwell_idle', 100, 0, 2000, ' ms', 'Espera para abrir sin actividad')}</div>
+      <div class="row"><span>… con algo activo</span>{@render stepper('dwell_busy', 100, 0, 2000, ' ms', 'Espera para abrir con actividad')}</div>
+      <div class="row">
+        <span>Modo fantasma</span>
+        {@render toggle(settings.ghost, 'Modo fantasma', () => set({ ghost: !settings.ghost }))}
+      </div>
+      <div class="row">
+        <span>Esconder con ventanas maximizadas</span>
+        {@render toggle(settings.hide_when_covered, 'Esconder con ventanas maximizadas', () => set({ hide_when_covered: !settings.hide_when_covered }))}
+      </div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section>
+      <h3 class="label">FOCUS</h3>
+      <div class="row"><span>Focus</span>{@render stepper('focus_mins', 5, 5, 60, ' min', 'Minutos de focus')}</div>
+      <div class="row"><span>Descanso</span>{@render stepper('break_mins', 1, 1, 30, ' min', 'Minutos de descanso')}</div>
+    </section>
+
+    <section>
+      <h3 class="label">SECCIONES DEL DOCK</h3>
+      <div class="chips">
+        {#each SECTIONS as s}
+          <button class="chip" class:on={settings.tabs.includes(s.id)} aria-pressed={settings.tabs.includes(s.id)} onclick={() => toggleSection(s.id)}>{s.label}</button>
+        {/each}
+      </div>
+    </section>
+
+    <section>
+      <h3 class="label">CLAUDE CODE</h3>
+      <div class="row">
+        <span>{claude.hooks ? 'Conectado' : 'Sin conectar'}</span>
+        <button class="btn" disabled={busy === 'hooks'} onclick={() => run('hooks', () => claudeCmd.hooks(claude.hooks ? 'uninstall' : 'install'))}>
+          {claude.hooks ? 'Desconectar' : 'Conectar'}
+        </button>
+      </div>
+      <div class="row">
+        <span>Abrir cuando pide permiso</span>
+        {@render toggle(settings.claude_peek, 'Abrir cuando Claude pide permiso', () => set({ claude_peek: !settings.claude_peek }))}
+      </div>
+    </section>
+    {#if error}<p class="err">{error}</p>{/if}
+  </div>
+</div>
+
+<style>
+  .settings {
+    position: absolute;
+    inset: 4px 0 4px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 28px;
+    overflow-y: auto;
+    padding-right: 6px;
+    font-family: var(--sans);
+    font-size: 13px;
+  }
+  .settings::-webkit-scrollbar { width: 6px; }
+  .settings::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
+  .col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  section { display: flex; flex-direction: column; }
+  h3 { margin: 0 0 2px; font-family: var(--mono); font-weight: 400; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; }
+  .row > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dim { color: var(--dim); font-size: 12px; }
+
+  .switch {
+    position: relative;
+    flex: none;
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.18);
+    transition: background 0.2s;
+  }
+  .switch i {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s var(--spring);
+  }
+  .switch.on { background: #6ee7b7; }
+  .switch.on i { transform: translateX(16px); }
+
+  .seg { display: flex; padding: 2px; border-radius: 9px; background: rgba(255, 255, 255, 0.08); }
+  .seg button { font-size: 11.5px; padding: 4px 8px; border-radius: 7px; color: var(--dim); }
+  .seg button.on { background: rgba(255, 255, 255, 0.16); color: var(--fg); }
+
+  .stepper { display: flex; align-items: center; gap: 2px; }
+  .stepper button { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; color: var(--dim); }
+  .stepper button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: var(--fg); }
+  .stepper .num { min-width: 62px; text-align: center; font-family: var(--mono); font-size: 12px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
+  .chip { padding: 5px 10px; border-radius: 999px; font-size: 12px; color: var(--dim); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+  .chip.on { color: #141010; background: var(--fg); box-shadow: none; }
+
+  .btn { padding: 5px 12px; border-radius: 9px; font-size: 12px; background: rgba(255, 255, 255, 0.12); }
+  .btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  .err { color: #ff9c94; font-size: 12px; }
+</style>
