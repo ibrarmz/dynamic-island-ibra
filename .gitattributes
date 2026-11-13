@@ -1,0 +1,5 @@
+# LF everywhere: the ci/*.sh scripts run in Linux containers and break with CRLF.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary
