@@ -39,6 +39,14 @@ O sin instalar nada, los `.deb` y `.rpm` desde Docker (también desde Windows): 
 
 La isla vive arriba de la pantalla principal; el ícono de bandeja tiene **Configuración**, **Mostrar / ocultar** y **Salir**. Solo corre una instancia: si ya hay una, la segunda se cierra sola.
 
+## Publicar una versión
+
+```sh
+npm run release -- 0.1.2
+```
+
+Pone la versión en `package.json`, `tauri.conf.json` y `Cargo.toml`, hace commit, crea el tag `v0.1.2` y lo sube. GitHub Actions (`.github/workflows/release.yml`) compila el instalador de Windows y los paquetes `.deb`/`.rpm` y los publica en el release, en unos 15–20 minutos.
+
 ## Ajustes
 
 Ícono de engrane en el dock, o bandeja → **Configuración**. Se guardan en `settings.json` dentro de la carpeta de configuración de la app.
