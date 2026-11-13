@@ -97,15 +97,21 @@ fn run(app: &AppHandle, tx: Sender<Msg>, rx: Receiver<Msg>) -> Result<()> {
             art_key = key;
             let art = session.as_ref().and_then(read_art).unwrap_or_default();
             art_missing = track.active && art.data.is_none();
-            app.state::<MediaState>().last.lock().unwrap().1 = art.clone();
-            let _ = app.emit("media-art", art);
+            super::publish_art(app, &track, art);
         }
 
-        let state = app.state::<MediaState>();
-        let mut last = state.last.lock().unwrap();
-        if !last.0.same_as(&track) {
-            last.0 = track.clone();
-            drop(last);
+        // Hold the lock only for the comparison: it must not be held across the
+        // wait below, or every reader (UI snapshot, HD cover lookup) blocks.
+        let changed = {
+            let state = app.state::<MediaState>();
+            let mut last = state.last.lock().unwrap();
+            let changed = !last.0.same_as(&track);
+            if changed {
+                last.0 = track.clone();
+            }
+            changed
+        };
+        if changed {
             let _ = app.emit("media", track);
         }
 

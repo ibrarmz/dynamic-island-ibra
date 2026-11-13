@@ -128,6 +128,15 @@
     </section>
 
     <section>
+      <h3 class="label">MÚSICA</h3>
+      <div class="row">
+        <span>Carátulas en HD</span>
+        {@render toggle(settings.hd_art, 'Carátulas en HD', () => set({ hd_art: !settings.hd_art }))}
+      </div>
+      <p class="hint">Busca la portada oficial en el catálogo de iTunes. Envía el artista y el título de lo que suena.</p>
+    </section>
+
+    <section>
       <h3 class="label">SECCIONES DEL DOCK</h3>
       <div class="chips">
         {#each SECTIONS as s}
@@ -234,4 +243,5 @@
   .btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
   button:disabled { opacity: 0.45; cursor: default; }
   .err { color: #ff9c94; font-size: 12px; }
+  .hint { margin: 0 0 2px; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
 </style>

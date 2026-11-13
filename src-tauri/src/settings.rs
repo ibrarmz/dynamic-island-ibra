@@ -29,6 +29,8 @@ pub struct Settings {
     pub claude_peek: bool,
     /// How see-through the island's background is, in percent (0 = solid).
     pub transparency: u32,
+    /// Look up HD covers in the iTunes catalog (sends artist + title). Opt-in.
+    pub hd_art: bool,
 }
 
 impl Default for Settings {
@@ -44,6 +46,7 @@ impl Default for Settings {
             tabs: TABS.iter().map(|s| s.to_string()).collect(),
             claude_peek: true,
             transparency: 0,
+            hd_art: false,
         }
     }
 }
@@ -130,6 +133,9 @@ pub fn update(app: &AppHandle, patch: Value) -> Result<Settings, String> {
         }
         if before.focus_mins != after.focus_mins || before.break_mins != after.break_mins {
             crate::focus::apply_defaults(app, after.focus_mins, after.break_mins);
+        }
+        if after.hd_art && !before.hd_art {
+            crate::media::upgrade_current(app);
         }
         let _ = app.emit("settings", after.clone());
     }
