@@ -4,11 +4,13 @@ Una isla dinámica estilo macOS para Windows, Fedora y Debian, hecha con **Tauri
 
 ## Instalar
 
+Descarga el instalador de la [última versión](https://github.com/ibrarmz/dynamic-island-ibra/releases/latest).
+
 | Sistema | Archivo | Notas |
 | --- | --- | --- |
-| Windows 10/11 | `Dynamic Island_0.1.0_x64-setup.exe` | Instala por usuario, sin permisos de administrador. Al desinstalar quita los hooks de Claude y el inicio automático. |
-| Debian / Ubuntu | `Dynamic Island_0.1.0_amd64.deb` | `sudo apt install "./Dynamic Island_0.1.0_amd64.deb"` |
-| Fedora | `Dynamic Island-0.1.0-1.x86_64.rpm` | `sudo dnf install "./Dynamic Island-0.1.0-1.x86_64.rpm"` |
+| Windows 10/11 | `DynamicIsland_0.1.0_x64-setup.exe` | Instala por usuario, sin permisos de administrador. Al desinstalar quita los hooks de Claude y el inicio automático. No está firmado: si SmartScreen avisa, "Más información" → "Ejecutar de todas formas". |
+| Debian / Ubuntu | `dynamic-island_0.1.0_amd64.deb` | `sudo apt install ./dynamic-island_0.1.0_amd64.deb` |
+| Fedora | `dynamic-island-0.1.0-1.x86_64.rpm` | `sudo dnf install ./dynamic-island-0.1.0-1.x86_64.rpm` |
 
 En Linux, antes de desinstalar, corre `dynamic-island hooks uninstall` si conectaste Claude Code y apaga "Iniciar con el sistema" en Ajustes: el paquete se desinstala como root y no puede tocar la configuración de tu usuario.
 
