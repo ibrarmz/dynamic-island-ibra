@@ -141,6 +141,31 @@ pub fn settings_set(app: AppHandle, patch: Value) -> Result<Settings, String> {
     update(&app, patch)
 }
 
+/// Name the autostart plugin registers under (the product name).
+const AUTOSTART_NAME: &str = "Dynamic Island";
+
+/// Used by the uninstallers, without a running app: drop the "start with the
+/// system" entry so it doesn't point at a deleted executable.
+pub fn remove_autostart_entry() {
+    #[cfg(windows)]
+    unsafe {
+        use windows::{
+            core::{w, HSTRING},
+            Win32::System::Registry::{RegDeleteKeyValueW, HKEY_CURRENT_USER},
+        };
+        let _ = RegDeleteKeyValueW(
+            HKEY_CURRENT_USER,
+            w!(r"Software\Microsoft\Windows\CurrentVersion\Run"),
+            &HSTRING::from(AUTOSTART_NAME),
+        );
+    }
+    #[cfg(target_os = "linux")]
+    if let Some(home) = std::env::var_os("HOME") {
+        let file = PathBuf::from(home).join(".config/autostart").join(format!("{AUTOSTART_NAME}.desktop"));
+        let _ = fs::remove_file(file);
+    }
+}
+
 /// Start with the system (registry Run key on Windows, ~/.config/autostart on Linux).
 #[tauri::command]
 pub fn autostart(app: AppHandle, enable: Option<bool>) -> Result<bool, String> {

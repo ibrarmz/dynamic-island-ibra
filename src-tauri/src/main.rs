@@ -37,6 +37,13 @@ fn main() {
             }
             return;
         }
+        // Run by both uninstallers (NSIS and MSI): undo what lives outside the
+        // install folder. Best effort; never blocks the uninstall.
+        Some("uninstall-cleanup") => {
+            let _ = claude::hooks::uninstall();
+            settings::remove_autostart_entry();
+            return;
+        }
         _ => {}
     }
 

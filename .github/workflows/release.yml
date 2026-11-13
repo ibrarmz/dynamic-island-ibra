@@ -69,6 +69,7 @@ jobs:
           mkdir out
           if [ "$RUNNER_OS" = "Windows" ]; then
             cp "$B/nsis/Dynamic Island_${VERSION}_x64-setup.exe" "out/DynamicIsland_${VERSION}_x64-setup.exe"
+            cp "$B"/msi/*.msi "out/DynamicIsland_${VERSION}_x64.msi"
           else
             cp "$B/deb/Dynamic Island_${VERSION}_amd64.deb" "out/dynamic-island_${VERSION}_amd64.deb"
             cp "$B/rpm/Dynamic Island-${VERSION}-1.x86_64.rpm" "out/dynamic-island-${VERSION}-1.x86_64.rpm"

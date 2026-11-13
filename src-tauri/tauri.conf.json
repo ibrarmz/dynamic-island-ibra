@@ -36,7 +36,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "deb", "rpm"],
+    "targets": ["nsis", "msi", "deb", "rpm"],
     "publisher": "Dynamic Island",
     "category": "Utility",
     "shortDescription": "Una isla dinámica para tu escritorio",
@@ -54,6 +54,11 @@
         "installMode": "currentUser",
         "languages": ["Spanish"],
         "installerHooks": "windows/hooks.nsh"
+      },
+      "wix": {
+        "language": "es-ES",
+        "fragmentPaths": ["windows/msi-cleanup.wxs"],
+        "componentGroupRefs": ["IslandUninstallCleanup"]
       }
     }
   }

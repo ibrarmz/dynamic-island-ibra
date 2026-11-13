@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSI counterpart of windows/hooks.nsh: on a real uninstall (not an upgrade),
+  run `dynamic-island.exe uninstall-cleanup` as the user so it can remove the
+  Claude Code hooks and the "start with Windows" entry from their profile.
+  Pulled into the package through componentGroupRefs in tauri.conf.json.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <ComponentGroup Id="IslandUninstallCleanup">
+      <!-- A component is needed for the group (and so this fragment) to be linked. -->
+      <Component Id="IslandCleanupMarker" Directory="INSTALLDIR" Guid="7D1A4C2E-5B3F-4E8A-9C61-2F0D8B4A6E13">
+        <RegistryValue Root="HKLM" Key="Software\Dynamic Island" Name="InstalledByMsi" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- FileKey "Path" is the main executable in Tauri's MSI template. Immediate = runs as the user, files still present. -->
+    <CustomAction Id="IslandUninstallCleanup" FileKey="Path" ExeCommand="uninstall-cleanup" Execute="immediate" Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="IslandUninstallCleanup" After="InstallInitialize">(REMOVE="ALL") AND NOT UPGRADINGPRODUCTCODE</Custom>
+    </InstallExecuteSequence>
+  </Fragment>
+</Wix>
