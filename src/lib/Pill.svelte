@@ -34,7 +34,9 @@
     {@render compact(acts[1])}
     {@render compact(acts[0])}
   {:else if acts[0] === 'music'}
-    <span class="row"><Cover /><span class="app">{media.track.app}</span></span>
+    <span class="row" title={[media.track.title, media.track.artist].filter(Boolean).join(' · ')}>
+      <Cover /><span class="song">{media.track.title || media.track.app}</span>
+    </span>
     {@render eq()}
   {:else if acts[0] === 'focus'}
     <span class="row violet pad">{@html icon('timer', 16, 2)}<span class="tag">FOCUS</span></span>
@@ -69,7 +71,15 @@
   .tag { font-size: 11px; letter-spacing: 0.12em; white-space: nowrap; }
   .msg { font-size: 11.5px; white-space: nowrap; }
   .big { font-size: 13px; }
-  .app { font-size: 11px; color: rgba(244, 237, 230, 0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .song {
+    min-width: 0;
+    font-family: var(--sans);
+    font-size: 12px;
+    color: rgba(244, 237, 230, 0.9);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   .spin { display: grid; animation: spin 2.4s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
