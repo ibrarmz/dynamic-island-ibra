@@ -15,7 +15,8 @@
 
   // Must match WIN_W in src-tauri/src/hit.rs
   const WIN_W = 760;
-  const TOP = 8;
+  // Flush with the top edge: the island grows out of the screen's frame, like a notch.
+  const TOP = 0;
   const OPEN = { w: 720, h: 292 };
   const PILL_H = 38;
 
@@ -257,6 +258,11 @@
   class:ghost={settings.ghost && ghost && !open}
   style="width:{w}px;height:{h}px;top:{TOP}px;left:{x}px;transform:translateY({lift}px);--tr:{tint[0]};--tg:{tint[1]};--tb:{tint[2]};--glow:{glow}"
 >
+  <!-- Concave fillets where the notch meets the top edge. -->
+  <i class="ear l" aria-hidden="true"></i>
+  <i class="ear r" aria-hidden="true"></i>
+
+  <div class="shell">
   <div class="glow" aria-hidden="true"></div>
 
   <div class="pill-layer" class:shown={!open && !line} aria-hidden={open || line}>
@@ -316,6 +322,7 @@
       </nav>
     {/if}
   </div>
+  </div>
 </div>
 
 <style>
@@ -323,33 +330,50 @@
     /* left comes from the position setting; it animates with width so the
        island stays anchored (centred, or hugging its edge) while it grows. */
     position: absolute;
-    border-radius: 19px;
-    overflow: hidden;
-    background: rgba(13, 10, 9, 0.93);
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.07),
-      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    --notch: #000;
+    --r: 16px;
+    --ear: 10px;
     transition:
       width 0.6s var(--spring),
       left 0.6s var(--spring),
       height 0.6s var(--spring),
       transform 0.45s var(--spring),
       opacity 0.15s ease,
-      border-radius 0.5s ease,
-      background 0.4s ease,
       --tr 0.8s ease, --tg 0.8s ease, --tb 0.8s ease, --glow 0.8s ease;
   }
-  .island.line {
-    background: rgba(13, 10, 9, 0.82);
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-      0 1px 6px rgba(0, 0, 0, 0.35);
-  }
+  .island.line { --r: 5px; --ear: 4px; }
+  .island.open { --r: 30px; --ear: 14px; }
   /* Passing over it: nearly invisible so what's underneath stays readable. */
   .island.ghost { opacity: 0.15; }
-  .island.open {
-    border-radius: 30px;
-    background: rgba(24, 19, 17, 0.88);
+
+  /* Square on top (it's part of the frame), rounded only at the bottom. */
+  .shell {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: 0 0 var(--r) var(--r);
+    background: var(--notch);
+    box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.6);
+    transition: border-radius 0.5s ease;
+  }
+  .island.line .shell { box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.22); }
+
+  /* A square of notch colour with a quarter circle cut out of its outer
+     bottom corner: the top edge flows into the island's side. */
+  .ear {
+    position: absolute;
+    top: 0;
+    width: var(--ear);
+    height: var(--ear);
+    transition: width 0.5s ease, height 0.5s ease;
+  }
+  .ear.l {
+    right: 100%;
+    background: radial-gradient(farthest-side at 0 100%, transparent calc(100% - 0.75px), var(--notch) 100%);
+  }
+  .ear.r {
+    left: 100%;
+    background: radial-gradient(farthest-side at 100% 100%, transparent calc(100% - 0.75px), var(--notch) 100%);
   }
 
   .glow {
@@ -357,8 +381,7 @@
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(120% 100% at 50% 140%, rgb(var(--tr) var(--tg) var(--tb) / calc(0.5 * var(--glow))) 0%, transparent 68%),
-      radial-gradient(50% 70% at 10% -20%, rgb(var(--tr) var(--tg) var(--tb) / calc(0.16 * var(--glow))) 0%, transparent 70%);
+      radial-gradient(120% 100% at 50% 150%, rgb(var(--tr) var(--tg) var(--tb) / calc(0.4 * var(--glow))) 0%, transparent 65%);
   }
 
   /* Both layers always exist; only these classes change. Hidden layers are also
