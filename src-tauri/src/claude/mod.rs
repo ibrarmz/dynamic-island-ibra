@@ -19,6 +19,8 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 const MAX_LINES: usize = 6;
 const MAX_LINE_LEN: usize = 160;
+/// A subagent silent for this long no longer counts as running.
+const AGENT_STALE_MS: u64 = 600_000;
 
 #[derive(Serialize, Clone, Default)]
 pub struct Diff {
@@ -44,6 +46,12 @@ pub struct Agent {
     ended_at: Option<u64>,
     tools: u32,
     message: Option<String>,
+    /// Arrival time of its latest event; long-silent agents are dropped on a new prompt.
+    #[serde(skip)]
+    last_seen: u64,
+    /// Hook start time of its newest event applied; older arrivals are stale.
+    #[serde(skip)]
+    last_ts: u64,
 }
 
 impl Agent {
@@ -59,6 +67,8 @@ impl Agent {
             ended_at: None,
             tools: 0,
             message: None,
+            last_seen: now,
+            last_ts: 0,
         }
     }
 
@@ -126,10 +136,22 @@ impl Session {
         }
     }
 
+    /// Injected prompts (background agent reports) continue the current task.
+    fn resume(&mut self) {
+        self.status = "working";
+        self.label = "PENSANDO";
+        self.ended_at = None;
+        self.message = None;
+    }
+
     fn start_task(&mut self, prompt: &str, now: u64) {
+        // Agents still running (seen recently) outlive the new prompt.
+        let mut agents = std::mem::take(&mut self.agents);
+        agents.retain(|a| a.status != "done" && now.saturating_sub(a.last_seen) <= AGENT_STALE_MS);
         *self = Session {
             project: std::mem::take(&mut self.project),
             last_ts: self.last_ts,
+            agents,
             ..Session::new(std::mem::take(&mut self.id), now)
         };
         self.prompt = prompt.trim().to_string();
@@ -275,7 +297,18 @@ fn agent_entry<'a>(s: &'a mut Session, id: &str, kind: &str, now: u64) -> &'a mu
             s.agents.len() - 1
         }
     };
-    &mut s.agents[i]
+    let a = &mut s.agents[i];
+    if a.kind.is_empty() && !kind.is_empty() {
+        a.kind = kind.to_string();
+    }
+    a.last_seen = now;
+    a
+}
+
+/// Prompts Claude Code injects itself (background agent reports), not typed by the user.
+fn is_injected(prompt: &str) -> bool {
+    let p = prompt.trim_start();
+    p.starts_with("<task-notification") || p.starts_with("<agent-message")
 }
 
 /// Apply one hook event to the session map (pure: no I/O).
@@ -289,24 +322,35 @@ pub(crate) fn apply(map: &mut HashMap<String, Session>, ev: &Value, now: u64) ->
     }
 
     let s = map.entry(id.clone()).or_insert_with(|| Session::new(id, now));
-    // Async hooks may arrive out of order: ignore anything older than what we applied.
+    // Async hooks may arrive out of order: ignore anything older than what we applied
+    // on the same stream (main thread, or one subagent). Start/Stop are never stale.
     let ts = ev["ts"].as_u64().unwrap_or(now);
-    if ts < s.last_ts {
-        return Applied { changed: false, peek: false };
+    let agent_id = ev["agent_id"].as_str().filter(|a| !a.is_empty());
+    let agent_stream = agent_id.is_some() && matches!(name, "PreToolUse" | "PostToolUse" | "Notification");
+    let lifecycle = matches!(name, "SubagentStart" | "SubagentStop");
+    if agent_stream {
+        let seen = s.agents.iter().find(|a| Some(a.id.as_str()) == agent_id).map(|a| a.last_ts);
+        if seen.is_some_and(|l| ts < l) {
+            return Applied { changed: false, peek: false };
+        }
+    } else if !lifecycle {
+        if ts < s.last_ts {
+            return Applied { changed: false, peek: false };
+        }
+        s.last_ts = ts;
     }
-    s.last_ts = ts;
     if let Some(cwd) = ev["cwd"].as_str() {
         s.project = basename(cwd.trim_end_matches(['/', '\\']));
     }
     s.updated_at = now;
 
-    let agent_id = ev["agent_id"].as_str().filter(|a| !a.is_empty());
     let agent_kind = ev["agent_type"].as_str().unwrap_or("");
     let mut peek = false;
 
     // Events fired from inside a subagent only touch that agent.
     if let (Some(aid), "PreToolUse" | "PostToolUse" | "Notification") = (agent_id, name) {
         let a = agent_entry(s, aid, agent_kind, now);
+        a.last_ts = ts;
         match name {
             "PreToolUse" => a.tool_use(ev["tool_name"].as_str().unwrap_or(""), &ev["tool_input"]),
             "PostToolUse" => {
@@ -330,7 +374,14 @@ pub(crate) fn apply(map: &mut HashMap<String, Session>, ev: &Value, now: u64) ->
     }
 
     match name {
-        "UserPromptSubmit" => s.start_task(ev["prompt"].as_str().unwrap_or(""), now),
+        "UserPromptSubmit" => {
+            let prompt = ev["prompt"].as_str().unwrap_or("");
+            if is_injected(prompt) {
+                s.resume();
+            } else {
+                s.start_task(prompt, now);
+            }
+        }
         "PreToolUse" => {
             let tool = ev["tool_name"].as_str().unwrap_or("");
             let input = &ev["tool_input"];
@@ -343,6 +394,7 @@ pub(crate) fn apply(map: &mut HashMap<String, Session>, ev: &Value, now: u64) ->
         "PostToolUse" => {
             if s.status == "waiting" {
                 s.status = "working";
+                s.label = "TRABAJANDO";
                 s.message = None;
             }
         }
@@ -360,6 +412,7 @@ pub(crate) fn apply(map: &mut HashMap<String, Session>, ev: &Value, now: u64) ->
                 let i = s.pending.iter().position(|(k, _)| k == agent_kind).or(if s.pending.is_empty() { None } else { Some(0) });
                 let task = i.map(|i| s.pending.remove(i).1).unwrap_or_default();
                 let a = agent_entry(s, aid, agent_kind, now);
+                a.last_ts = a.last_ts.max(ts);
                 if a.task.is_empty() {
                     a.task = task;
                 }
@@ -368,6 +421,7 @@ pub(crate) fn apply(map: &mut HashMap<String, Session>, ev: &Value, now: u64) ->
         "SubagentStop" => {
             if let Some(aid) = agent_id {
                 let a = agent_entry(s, aid, agent_kind, now);
+                a.last_ts = a.last_ts.max(ts);
                 a.status = "done";
                 a.label = "LISTO";
                 a.ended_at = Some(now);
@@ -542,16 +596,104 @@ mod tests {
         assert_eq!(a.ended_at, Some(NOW));
     }
 
+    /// Apply with explicit hook timestamp and arrival time.
+    fn ap(map: &mut HashMap<String, Session>, mut ev: Value, ts: u64, now: u64) -> Applied {
+        ev["session_id"] = json!("s1");
+        ev["ts"] = json!(ts);
+        apply(map, &ev, now)
+    }
+
     #[test]
-    fn new_prompt_clears_agents() {
+    fn new_prompt_keeps_active_agents() {
+        let mut map = HashMap::new();
+        ap(&mut map, agent_call("A"), 1, 1_000);
+        ap(&mut map, start("a1"), 2, 1_000);
+        ap(&mut map, start("a2"), 3, 1_000);
+        ap(&mut map, json!({"hook_event_name":"SubagentStop","agent_id":"a2","agent_type":"Explore"}), 4, 1_000);
+        ap(&mut map, start("a3"), 5, 1_000);
+        // a1 stays active, a3 goes silent for more than 10 minutes.
+        ap(&mut map, json!({"hook_event_name":"PreToolUse","agent_id":"a1","agent_type":"Explore",
+            "tool_name":"Read","tool_input":{"file_path":"/a"}}), 6, 700_000);
+        ap(&mut map, agent_call("B"), 7, 700_000);
+        ap(&mut map, json!({"hook_event_name":"UserPromptSubmit","prompt":"otra"}), 8, 700_000 + 1_000);
+        let s = &map["s1"];
+        let ids: Vec<&str> = s.agents.iter().map(|a| a.id.as_str()).collect();
+        assert_eq!(ids, vec!["a1"]);
+        assert!(s.pending.is_empty());
+        assert_eq!(s.prompt, "otra");
+    }
+
+    #[test]
+    fn injected_prompt_keeps_agents_and_prompt() {
         let (map, _) = run(vec![
+            json!({"hook_event_name":"UserPromptSubmit","prompt":"haz algo"}),
             agent_call("A"),
             start("a1"),
-            agent_call("B"),
-            json!({"hook_event_name":"UserPromptSubmit","prompt":"otra"}),
+            json!({"hook_event_name":"SubagentStop","agent_id":"a1","agent_type":"Explore"}),
+            json!({"hook_event_name":"Stop"}),
+            json!({"hook_event_name":"UserPromptSubmit","prompt":"  <task-notification>\nx</task-notification>"}),
         ]);
-        assert!(map["s1"].agents.is_empty());
-        assert!(map["s1"].pending.is_empty());
+        let s = &map["s1"];
+        assert_eq!(s.prompt, "haz algo");
+        assert_eq!(s.agents.len(), 1);
+        assert_eq!(s.status, "working");
+        assert_eq!(s.label, "PENSANDO");
+        assert!(s.ended_at.is_none());
+        assert!(s.reached.iter().all(|r| *r));
+        assert_eq!(s.phase, 3);
+
+        let (map, _) = run(vec![
+            json!({"hook_event_name":"UserPromptSubmit","prompt":"haz algo"}),
+            start("a1"),
+            json!({"hook_event_name":"UserPromptSubmit","prompt":"<agent-message from=\"x\">hi"}),
+        ]);
+        assert_eq!(map["s1"].prompt, "haz algo");
+        assert_eq!(map["s1"].agents.len(), 1);
+
+        // A generic leading "<" is a real prompt.
+        let (map, _) = run(vec![
+            json!({"hook_event_name":"UserPromptSubmit","prompt":"uno"}),
+            json!({"hook_event_name":"UserPromptSubmit","prompt":"<div> que es esto"}),
+        ]);
+        assert_eq!(map["s1"].prompt, "<div> que es esto");
+    }
+
+    #[test]
+    fn out_of_order_across_agents_not_dropped() {
+        let mut map = HashMap::new();
+        let tool = |id: &str| json!({"hook_event_name":"PreToolUse","agent_id":id,"agent_type":"Explore",
+            "tool_name":"Read","tool_input":{"file_path":"/a"}});
+        ap(&mut map, start("a1"), 1, NOW);
+        ap(&mut map, start("a2"), 2, NOW);
+        assert!(ap(&mut map, tool("a1"), 50, NOW).changed);
+        // Older than a1's last event but a different stream.
+        assert!(ap(&mut map, tool("a2"), 40, NOW).changed);
+        assert_eq!(map["s1"].agents[1].tools, 1);
+        // Same stream, older: dropped.
+        assert!(!ap(&mut map, tool("a1"), 45, NOW).changed);
+        assert_eq!(map["s1"].agents[0].tools, 1);
+        // Main thread has its own clock.
+        assert!(ap(&mut map, json!({"hook_event_name":"Stop"}), 10, NOW).changed);
+        // Stop of a subagent is never stale.
+        assert!(ap(&mut map, json!({"hook_event_name":"SubagentStop","agent_id":"a1","agent_type":"Explore"}), 3, NOW).changed);
+        assert_eq!(map["s1"].agents[0].status, "done");
+    }
+
+    #[test]
+    fn kind_filled_in_and_main_wait_label_restored() {
+        let (map, _) = run(vec![
+            json!({"hook_event_name":"PreToolUse","agent_id":"a1","tool_name":"Read","tool_input":{}}),
+            json!({"hook_event_name":"PreToolUse","agent_id":"a1","agent_type":"Plan","tool_name":"Read","tool_input":{}}),
+        ]);
+        assert_eq!(map["s1"].agents[0].kind, "Plan");
+
+        let (map, _) = run(vec![
+            json!({"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{}}),
+            json!({"hook_event_name":"Notification","notification_type":"permission_prompt","message":"m"}),
+            json!({"hook_event_name":"PostToolUse","tool_name":"Read"}),
+        ]);
+        assert_eq!(map["s1"].status, "working");
+        assert_eq!(map["s1"].label, "TRABAJANDO");
     }
 
     #[test]
