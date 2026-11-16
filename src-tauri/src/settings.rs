@@ -27,6 +27,8 @@ pub struct Settings {
     pub tabs: Vec<String>,
     /// Open by itself when Claude asks for permission.
     pub claude_peek: bool,
+    /// How see-through the island's background is, in percent (0 = solid).
+    pub transparency: u32,
 }
 
 impl Default for Settings {
@@ -41,6 +43,7 @@ impl Default for Settings {
             break_mins: 5,
             tabs: TABS.iter().map(|s| s.to_string()).collect(),
             claude_peek: true,
+            transparency: 0,
         }
     }
 }
@@ -54,6 +57,8 @@ impl Settings {
         self.dwell_busy = self.dwell_busy.clamp(0, 2000);
         self.focus_mins = self.focus_mins.clamp(1, 60);
         self.break_mins = self.break_mins.clamp(1, 60);
+        // Past 70 % the text loses its backing and becomes hard to read.
+        self.transparency = self.transparency.min(70);
         self.tabs.retain(|t| TABS.contains(&t.as_str()));
         self.tabs.dedup();
         self

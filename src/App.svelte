@@ -256,7 +256,7 @@
   class:open
   class:line
   class:ghost={settings.ghost && ghost && !open}
-  style="width:{w}px;height:{h}px;top:{TOP}px;left:{x}px;transform:translateY({lift}px);--tr:{tint[0]};--tg:{tint[1]};--tb:{tint[2]};--glow:{glow}"
+  style="width:{w}px;height:{h}px;top:{TOP}px;left:{x}px;transform:translateY({lift}px);--alpha:{1 - settings.transparency / 100};--tr:{tint[0]};--tg:{tint[1]};--tb:{tint[2]};--glow:{glow}"
 >
   <!-- Concave fillets where the notch meets the top edge. -->
   <i class="ear l" aria-hidden="true"></i>
@@ -330,7 +330,8 @@
     /* left comes from the position setting; it animates with width so the
        island stays anchored (centred, or hugging its edge) while it grows. */
     position: absolute;
-    --notch: #000;
+    /* Background only; the transparency setting never fades the content. */
+    --notch: rgb(0 0 0 / var(--alpha, 1));
     --r: 16px;
     --ear: 10px;
     transition:

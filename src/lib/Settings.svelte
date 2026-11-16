@@ -46,6 +46,10 @@
     set({ [key]: Math.max(min, Math.min(max, settings[key] + delta)) });
   }
 
+  // Preview while dragging (the store mirror drives the island), save on release.
+  const previewTransparency = (e) => (settings.transparency = +e.currentTarget.value);
+  const saveTransparency = (e) => set({ transparency: +e.currentTarget.value });
+
   function toggleSection(id) {
     const on = settings.tabs.includes(id);
     // Keep the original order when turning a section back on.
@@ -80,6 +84,23 @@
           {#each POSITIONS as p}
             <button class:on={settings.position === p.id} aria-pressed={settings.position === p.id} onclick={() => set({ position: p.id })}>{p.label}</button>
           {/each}
+        </span>
+      </div>
+      <div class="row">
+        <span>Transparencia</span>
+        <span class="slider">
+          <input
+            type="range"
+            min="0"
+            max="70"
+            step="5"
+            value={settings.transparency}
+            aria-label="Transparencia de la isla"
+            style="--fill:{(settings.transparency / 70) * 100}%"
+            oninput={previewTransparency}
+            onchange={saveTransparency}
+          />
+          <span class="num">{settings.transparency}%</span>
         </span>
       </div>
     </section>
@@ -183,6 +204,27 @@
   .stepper button { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; color: var(--dim); }
   .stepper button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: var(--fg); }
   .stepper .num { min-width: 62px; text-align: center; font-family: var(--mono); font-size: 12px; }
+
+  .slider { display: flex; align-items: center; gap: 10px; }
+  .slider .num { min-width: 34px; text-align: right; font-family: var(--mono); font-size: 12px; }
+  input[type='range'] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 120px;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, #6ee7b7 var(--fill), rgba(255, 255, 255, 0.18) var(--fill));
+    cursor: pointer;
+  }
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+  input[type='range']:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.6); outline-offset: 4px; }
 
   .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
   .chip { padding: 5px 10px; border-radius: 999px; font-size: 12px; color: var(--dim); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }

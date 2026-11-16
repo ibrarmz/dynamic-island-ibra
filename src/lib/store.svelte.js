@@ -41,6 +41,7 @@ export const settings = $state({
   break_mins: 5,
   tabs: ['claude', 'music', 'focus', 'notes', 'sys'],
   claude_peek: true,
+  transparency: 0,
 });
 
 export const setSettings = (patch) =>
