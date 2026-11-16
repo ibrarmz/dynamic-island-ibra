@@ -181,13 +181,16 @@
   }
 
   // Linux: the core can't see the global cursor, so hover is detected here.
-  // Pointer events may arrive from anywhere in the window (the compositor
-  // doesn't always honour the input region, and WebKitGTK reports leaving at
-  // a point still inside the window), so check them against the hit rect; the
-  // core also sends `pointer-left` when GTK sees the pointer leave.
+  // Pointer events can come from anywhere in the window (the compositor
+  // doesn't always honour the input region), so they're checked against the
+  // hit rect. Leaving is reported by the core (`pointer-left`, from GTK):
+  // WebKitGTK follows each leave with a synthetic pointermove at the exit
+  // point, still inside the island, so pointer events are ignored until GTK
+  // says the cursor is back (`pointer-entered`).
   // No ghost fade: clicks can't pass through the island itself on Linux.
   let dwellT;
   let inside = false;
+  let outside = false;
   const inHit = (e) => e.clientX >= hit.x && e.clientX <= hit.x + hit.w && e.clientY >= hit.y && e.clientY <= hit.y + hit.h;
   function domLeave() {
     clearTimeout(dwellT);
@@ -202,6 +205,7 @@
       onHover('active');
     };
     const track = (e) => {
+      if (outside) return;
       if (!inHit(e)) return domLeave();
       if (!inside) {
         inside = true;
@@ -212,9 +216,19 @@
     };
     root.addEventListener('pointerenter', track);
     root.addEventListener('pointermove', track);
-    root.addEventListener('pointerdown', (e) => inHit(e) && !open && activate());
+    // A click is proof the cursor is really here.
+    root.addEventListener('pointerdown', (e) => {
+      outside = false;
+      if (!inHit(e)) return;
+      inside = true;
+      if (!open) activate();
+    });
     root.addEventListener('pointerleave', domLeave);
-    listen('pointer-left', domLeave);
+    listen('pointer-left', () => {
+      outside = true;
+      domLeave();
+    });
+    listen('pointer-entered', () => (outside = false));
   }
 
   onMount(() => {

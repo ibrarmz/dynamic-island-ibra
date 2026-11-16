@@ -386,18 +386,26 @@ mod platform {
         });
     }
 
-    /// The UI can't always tell when the cursor leaves: WebKitGTK reports the
-    /// crossing at a point that may still be inside the (larger) window, so
-    /// the page never sees a `pointerleave`. GTK does see the pointer leave the
-    /// input region; forward that as `pointer-left`.
+    /// The UI can't tell on its own when the cursor leaves: WebKitGTK follows
+    /// every leave with a synthetic `pointermove` at the exit point, which is
+    /// still inside the island, so the page thinks the cursor came back. GTK
+    /// sees the real crossings; forward them as `pointer-left` / `pointer-entered`
+    /// so the UI can ignore pointer events while the cursor is outside.
     pub fn watch_leave(win: &WebviewWindow) {
         let w = win.clone();
         let _ = win.run_on_main_thread(move || {
             use gtk::{gdk, glib, prelude::*};
             let Ok(gw) = w.gtk_window() else { return };
-            gw.add_events(gdk::EventMask::LEAVE_NOTIFY_MASK);
+            gw.add_events(gdk::EventMask::LEAVE_NOTIFY_MASK | gdk::EventMask::ENTER_NOTIFY_MASK);
+            // Moving between our own widgets (the webview) isn't a crossing.
+            let w2 = w.clone();
+            gw.connect_enter_notify_event(move |_, ev| {
+                if ev.detail() != gdk::NotifyType::Inferior {
+                    let _ = tauri::Emitter::emit(&w2, "pointer-entered", ());
+                }
+                glib::Propagation::Proceed
+            });
             gw.connect_leave_notify_event(move |_, ev| {
-                // Moving into a child widget (the webview) isn't leaving.
                 if ev.detail() != gdk::NotifyType::Inferior {
                     let _ = tauri::Emitter::emit(&w, "pointer-left", ());
                 }
