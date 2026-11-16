@@ -4,7 +4,7 @@
 use serde_json::{json, Value};
 use std::{fs, path::PathBuf};
 
-const EVENTS: [(&str, bool); 7] = [
+const EVENTS: [(&str, bool); 9] = [
     // (event, needs a tool matcher)
     ("PreToolUse", true),
     ("PostToolUse", true),
@@ -13,6 +13,8 @@ const EVENTS: [(&str, bool); 7] = [
     ("Stop", false),
     ("SessionStart", false),
     ("SessionEnd", false),
+    ("SubagentStart", false),
+    ("SubagentStop", false),
 ];
 
 fn settings_path() -> Result<PathBuf, String> {
@@ -105,10 +107,27 @@ pub fn uninstall() -> Result<(), String> {
     rewrite(false)
 }
 
+/// True when the island is connected (one of our hooks exists somewhere) but some
+/// event in `EVENTS` has none of ours, e.g. a set installed before SubagentStart existed.
+fn missing_events(settings: &Value) -> bool {
+    let Some(hooks) = settings["hooks"].as_object() else { return false };
+    let ours_in = |groups: &Value| {
+        groups
+            .as_array()
+            .into_iter()
+            .flatten()
+            .flat_map(|g| g["hooks"].as_array().into_iter().flatten())
+            .any(is_ours)
+    };
+    let connected = hooks.values().any(ours_in);
+    connected && EVENTS.iter().any(|&(event, _)| !hooks.get(event).is_some_and(ours_in))
+}
+
 /// At startup: if the user connected Claude Code earlier but the hook now points
-/// at a file that no longer exists (moved, reinstalled, dev build deleted) or
-/// predates async hooks, rewrite it for this copy. Any island listens on the same
-/// channel, so a hook pointing at another existing copy is left alone.
+/// at a file that no longer exists (moved, reinstalled, dev build deleted), predates
+/// async hooks, or lacks events this build uses (e.g. SubagentStart/SubagentStop),
+/// rewrite it for this copy. Any island listens on the same channel, so a hook
+/// pointing at another existing copy is left alone.
 pub fn repair() {
     let Ok((_, settings)) = load() else { return };
     let hooks: Vec<&Value> = settings["hooks"]
@@ -124,7 +143,7 @@ pub fn repair() {
         let path = cmd.split('"').nth(1).unwrap_or("");
         h["async"] != Value::Bool(true) || path.is_empty() || !std::path::Path::new(path).exists()
     });
-    if !hooks.is_empty() && stale {
+    if !hooks.is_empty() && (stale || missing_events(&settings)) {
         let _ = install();
     }
 }
@@ -136,4 +155,35 @@ pub fn installed() -> Result<bool, String> {
         .is_some_and(|h| h.values().flat_map(|g| g.as_array().into_iter().flatten()).any(|g| {
             g["hooks"].as_array().is_some_and(|l| l.iter().any(is_ours))
         })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ours() -> Value {
+        json!({ "type": "command", "command": "\"/opt/island-hook\"", "async": true, "timeout": 5 })
+    }
+
+    #[test]
+    fn missing_events_detects_new_events() {
+        let settings = json!({ "hooks": { "PreToolUse": [{ "matcher": "*", "hooks": [ours()] }] } });
+        assert!(missing_events(&settings));
+    }
+
+    #[test]
+    fn missing_events_false_when_complete() {
+        let mut hooks = serde_json::Map::new();
+        for (event, _) in EVENTS {
+            hooks.insert(event.into(), json!([{ "hooks": [ours()] }]));
+        }
+        assert!(!missing_events(&json!({ "hooks": hooks })));
+    }
+
+    #[test]
+    fn missing_events_false_when_not_connected() {
+        assert!(!missing_events(&json!({})));
+        let foreign = json!({ "hooks": { "PreToolUse": [{ "hooks": [{ "type": "command", "command": "echo hi" }] }] } });
+        assert!(!missing_events(&foreign));
+    }
 }
