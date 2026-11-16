@@ -1,0 +1,47 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+A macOS-style "Dynamic Island" for Windows and Linux (Fedora/Debian), built with **Tauri 2 + Rust + Svelte 5**. Panels: Claude Code activity, music, focus timer, quick notes, system stats, settings. All user-facing text (UI, CLI errors, tray menu, README, installer) is in **Spanish**; code comments and commit messages are in English (`feat: …`, `release: vX.Y.Z`).
+
+## Commands
+
+Requires Node 20+ and Rust (MSVC toolchain on Windows; WebKitGTK dev libs on Linux — see README).
+
+```sh
+npm install
+npm run tauri dev        # dev with hot reload (builds island-hook first, then vite on :1420)
+npx tauri build          # installers → src-tauri/target/release/bundle/{nsis,msi,deb,rpm}
+npm run build:hook       # build island-hook and copy it to src-tauri/binaries/island-hook-<triple>
+npm run build            # frontend only → dist/
+cd src-tauri && cargo check / cargo clippy   # Rust only (workspace includes the `hook` crate)
+npm run release -- 0.1.4 # bump version in package.json, package-lock, tauri.conf.json, Cargo.toml/lock; commit, tag, push
+```
+
+There is no test suite or JS linter. Verification is manual or via the Linux Docker scripts in `ci/` (each Dockerfile's header has the exact `docker build`/`docker run` lines): `linux.Dockerfile` is the base build image, `linux-bundle.*` produces `.deb`/`.rpm` into `dist-linux/` (needs `dist/` built on the host first), `linux-smoke.*` runs the app on Xvfb, feeds it Claude hook events through `island-hook`, screenshots it, and checks that a second instance exits.
+
+`ISLAND_PEEK=home,claude,music,focus,notes,sys` opens each panel in turn at startup (for screenshots).
+
+Pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds on Windows + Linux and uploads NSIS, MSI, portable .zip (with `.github/portable-LEEME.txt`), .deb and .rpm to the GitHub release.
+
+## Architecture
+
+**Core pushes, UI listens.** Rust owns all state (`*State` structs registered with `.manage()` in `main.rs`) and emits Tauri events (`settings`, `claude`, `media`, `media-art`, `focus`, `hover`, `covered`, `peek`, `open-tab`). `src/lib/store.svelte.js` holds Svelte 5 `$state` mirrors, loads snapshots via `invoke` once in `init()`, then only updates from events — the UI never polls the core. The clock ticks once a minute unless something on screen shows seconds (`setClockSeconds`). This design is deliberate for low CPU/RAM; keep new features event-driven and avoid emitting when nothing changed (see `Track::same_as` in `media/mod.rs`).
+
+Adding a command means: `#[tauri::command]` fn in its module → register in `generate_handler!` in `main.rs` → call via `invoke` from the store/component. `settings.rs` is the source of truth for settings; the defaults object in `store.svelte.js` mirrors it and must be kept in sync.
+
+**One binary, several modes** (`main.rs`): `dynamic-island hook` (fallback hook client), `hooks install|uninstall`, `uninstall-cleanup` (run by both NSIS `windows/hooks.nsh` and MSI `windows/msi-cleanup.wxs` uninstallers), otherwise the GUI.
+
+**Claude Code integration** (`src-tauri/src/claude/`):
+- `hooks.rs` edits `~/.claude/settings.json` (backup first, leaves other hooks alone) to register async hooks for PreToolUse/PostToolUse/UserPromptSubmit/Notification/Stop/SessionStart/SessionEnd pointing at `island-hook` next to the app exe. `repair()` runs at startup.
+- `island-hook` (`src-tauri/hook/`) is a separate tiny crate (std + serde_json only) that `#[path]`-includes `src/claude/hookclient.rs` — that file is shared between the sidecar and the app's `hook` mode, so it must stay dependency-free beyond std/serde_json. It is bundled as a Tauri `externalBin`, hence `build:hook` runs before dev/build.
+- `ipc.rs` is the server: named pipe on Windows (rejects remote clients), Unix socket 0600 in `XDG_RUNTIME_DIR` on Linux; one JSON message per connection. **It is also the single-instance guard** — if `serve` can't claim the channel, the process exits before Tauri starts.
+- `mod.rs` turns events into per-session state (phase LEER/EDITAR/PROBAR/LISTO, diff preview, permission waits), drops stale out-of-order events by hook timestamp, and emits the most recently active session.
+
+**Window / hit-testing** (`hit.rs`): the window is a fixed transparent 760×330 rect at the top of the screen, click-through by default. The UI reports the island's hit rect via `set_hit_rect`; a background loop reads the cursor and drives away → ghost → active states (dwell time, Ctrl to force open), and emits `covered` when a maximized/fullscreen window is on that monitor. `WIN_W` must match between `hit.rs` and `src/App.svelte`. On Linux, native hover may be unavailable (`hover_native` returns false) and `App.svelte` falls back to DOM hover; Wayland sessions are forced onto XWayland (`GDK_BACKEND=x11`). XWayland can't see native Wayland windows, so on Plasma Wayland `kwin.rs` loads a KWin script over D-Bus (`org.kde.kwin.Scripting`) that calls back `dev.dynamicisland.Island.Covered(b)`; other desktops use the X11/EWMH check in `hit.rs`. On Linux, `App.svelte` detects the cursor leaving by checking pointer events against the hit rect, and `hit.rs` also forwards GTK `leave-notify` as `pointer-left`.
+
+**Platform split**: `#[cfg(windows)]` / `#[cfg(target_os = "linux")]` modules — e.g. `media/windows.rs` (SMTC) vs `media/linux.rs` (MPRIS via zbus), Win32 APIs in `hit.rs`/`ipc.rs`/`settings.rs` (registry autostart) vs X11 (`x11rb`) / `~/.config/autostart`. Changes to shared Rust code must compile on both; Windows is the primary tested platform, Linux is mostly compile-verified (see README "Estado").
+
+**Memory budget**: WebView2 flags in `tauri.conf.json` (`--disable-gpu`, single renderer, V8 lite mode, etc.) are intentional RAM optimizations; the release profile is size-optimized with `panic = "abort"`. Don't remove them casually.
