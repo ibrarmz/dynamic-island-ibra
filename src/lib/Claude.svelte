@@ -37,7 +37,7 @@
   const showAgents = $derived(!!s?.agents?.length && s.status !== 'waiting');
   const rows = $derived.by(() => {
     const list = s?.agents ?? [];
-    return [...list.filter((a) => a.status !== 'done'), ...list.filter((a) => a.status === 'done')].slice(0, 3);
+    return ['waiting', 'working', 'done'].flatMap((st) => list.filter((a) => a.status === st)).slice(0, 3);
   });
   const agentTool = (a) => (a.message ?? '').match(/permission to use (\w+)/i)?.[1]?.toUpperCase();
   const agentSub = (a) =>
@@ -80,7 +80,7 @@
                 {:else if a.status === 'waiting'}<span class="pulse sm"></span>
                 {:else}<span class="check">✓</span>{/if}
               </span>
-              <span class="akind">{a.kind}</span>
+              <span class="akind">{a.kind || 'AGENTE'}</span>
               <span class="atask">
                 <span class="at">{a.task || 'Subagente'}</span>
                 <span class="as">{agentSub(a)}</span>

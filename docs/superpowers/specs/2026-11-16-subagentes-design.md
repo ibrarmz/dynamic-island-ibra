@@ -48,7 +48,7 @@ cuál pide permiso, y que no diga LISTO mientras queden agentes trabajando.
   - `SubagentStart`: crea el agente y toma la primera tarea pendiente del mismo tipo (si no hay, la primera de cualquiera).
   - Evento con `agent_id` (`PreToolUse`, `PostToolUse`, `Notification`): actualiza solo ese agente (misma tabla de etiquetas LEYENDO/EDITANDO/… que la sesión); si el agente no existe (se perdió el `SubagentStart`), se crea.
   - `SubagentStop`: marca `done` y `ended_at`.
-  - `UserPromptSubmit`: vacía la lista y las tareas pendientes.
+  - `UserPromptSubmit`: si el prompt es inyectado (`<task-notification` / `<agent-message`) se reanuda la tarea sin tocar prompt ni agentes; si lo escribió el usuario, se conservan los agentes activos vistos en los últimos 10 minutos, se descartan los terminados o inactivos y se vacían las tareas pendientes.
   - Los agentes `done` se quedan en la lista para el panel; la cuenta "activos" es la de no `done`.
 - **Píldora (`Pill.svelte`):** con agentes activos y Claude trabajando: DELEGANDO + contador con puntos. Claude `done` con agentes activos: "✓ LISTO · N AGENTES SIGUEN" (la actividad `claude-done` se mantiene mientras haya agentes activos). Agente pidiendo permiso: "Agente <tipo> pide permiso · <TOOL>" (actividad `claude-wait`).
 - **Panel (`Claude.svelte`):** con agentes, la tarjeta central se reemplaza por la lista de agentes (máx. 3 visibles, activos primero): ícono de estado, tipo, tarea, acción actual, tiempo. Los `done` atenuados con ✓. Meta: "N agentes · M tools".

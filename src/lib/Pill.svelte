@@ -6,7 +6,8 @@
   // Highest priority first. One activity: full layout. Two: compact, the top one on the right.
   let { acts } = $props();
 
-  const waitAgent = $derived(waitingAgent());
+  // The main session's own permission wins over a subagent's.
+  const waitAgent = $derived(claude.session?.status === 'waiting' ? null : waitingAgent());
   const nAgents = $derived(activeAgents().length);
   const waitTool = $derived(
     waitAgent
@@ -57,7 +58,7 @@
       <span class="num big">{fmt.short(claudeElapsed())}</span>
     {/if}
   {:else if acts[0] === 'claude-wait'}
-    <span class="row pad"><span class="pulse"></span><span class="msg">{#if waitAgent}Agente <span class="clay">{waitAgent.kind}</span> pide permiso{:else}Claude pide permiso{/if}</span></span>
+    <span class="row pad"><span class="pulse"></span><span class="msg">{#if waitAgent}{#if waitAgent.kind}Agente <span class="clay">{waitAgent.kind}</span> pide permiso{:else}Un agente pide permiso{/if}{:else}Claude pide permiso{/if}</span></span>
     <span class="tag orange">{waitTool}</span>
   {:else if acts[0] === 'claude-done'}
     {#if nAgents}

@@ -87,7 +87,7 @@
   );
   const line = $derived(!open && acts.length === 0);
   // Claude asking for permission must be seen even behind a maximized window.
-  const tucked = $derived(settings.hide_when_covered && !open && covered && cStatus !== 'waiting');
+  const tucked = $derived(settings.hide_when_covered && !open && covered && cStatus !== 'waiting' && !waitingAgent());
   const pillW = $derived(
     acts.length === 2 ? 360 : acts[0] === 'claude-wait' ? 340 : acts[0]?.startsWith('claude') && activeAgents().length ? 380 : 290,
   );
@@ -134,7 +134,7 @@
       ? tab
       : ({ 'claude-wait': 'wait', 'claude-work': 'claude', 'claude-done': 'claude', focus: 'focus', music: 'music' }[acts[0]] ?? 'idle');
     if (key === 'wait') return ORANGE;
-    if (key === 'claude') return cStatus === 'waiting' ? ORANGE : CLAY;
+    if (key === 'claude') return cStatus === 'waiting' || waitingAgent() ? ORANGE : CLAY;
     if (key === 'focus') return VIOLET;
     if (key === 'notes') return [234, 179, 8];
     if (key === 'sys') return [16, 185, 129];
