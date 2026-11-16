@@ -935,6 +935,7 @@ dependencies = [
  "tauri-plugin-autostart",
  "tauri-plugin-notification",
  "ureq",
+ "webkit2gtk",
  "windows",
  "x11rb",
  "zbus 5.19.0",

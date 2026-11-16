@@ -10,6 +10,8 @@ mod media;
 mod notes;
 mod settings;
 mod sys;
+#[cfg(target_os = "linux")]
+mod webkit;
 
 use std::sync::OnceLock;
 use tauri::{
@@ -55,6 +57,8 @@ fn main() {
     if std::env::var_os("WAYLAND_DISPLAY").is_some() && std::env::var_os("GDK_BACKEND").is_none() {
         std::env::set_var("GDK_BACKEND", "x11");
     }
+    #[cfg(target_os = "linux")]
+    webkit::tune_env();
 
     // Claim the local channel; if another island owns it, this one isn't needed.
     let claimed = claude::ipc::serve(|bytes| {
@@ -108,6 +112,8 @@ fn main() {
             claude::hooks::repair();
 
             let win = app.get_webview_window("island").expect("island window missing");
+            #[cfg(target_os = "linux")]
+            webkit::tune(&win);
             hit::place_window(&win);
             win.show()?;
             hit::start(win.clone());

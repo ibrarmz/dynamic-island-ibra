@@ -45,6 +45,8 @@ gtk = "0.18"
 x11rb = "0.13"
 zbus = "5"
 ureq = "3"
+# Same version and features wry already uses; only for tuning the webview.
+webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 
 [profile.release]
 opt-level = "s"
