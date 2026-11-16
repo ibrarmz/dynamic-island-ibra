@@ -29,6 +29,49 @@ pub struct Diff {
     del: usize,
 }
 
+/// One subagent spawned by a session.
+#[derive(Serialize, Clone)]
+pub struct Agent {
+    id: String,
+    /// agent_type (Explore, Plan…)
+    kind: String,
+    task: String,
+    label: &'static str,
+    detail: String,
+    /// working | waiting | done
+    status: &'static str,
+    started_at: u64,
+    ended_at: Option<u64>,
+    tools: u32,
+    message: Option<String>,
+}
+
+impl Agent {
+    fn new(id: String, kind: String, task: String, now: u64) -> Self {
+        Self {
+            id,
+            kind,
+            task,
+            label: "TRABAJANDO",
+            detail: String::new(),
+            status: "working",
+            started_at: now,
+            ended_at: None,
+            tools: 0,
+            message: None,
+        }
+    }
+
+    fn tool_use(&mut self, tool: &str, input: &Value) {
+        let (_, label, detail) = describe_tool(tool, input);
+        self.status = "working";
+        self.message = None;
+        self.tools += 1;
+        self.label = label;
+        self.detail = detail;
+    }
+}
+
 #[derive(Serialize, Clone)]
 pub struct Session {
     id: String,
@@ -49,6 +92,10 @@ pub struct Session {
     ended_at: Option<u64>,
     tools: u32,
     message: Option<String>,
+    agents: Vec<Agent>,
+    /// (subagent_type, description) of Agent calls whose SubagentStart hasn't arrived yet.
+    #[serde(skip)]
+    pending: Vec<(String, String)>,
     updated_at: u64,
     /// Hook start time of the newest event applied; older arrivals are stale.
     #[serde(skip)]
@@ -72,6 +119,8 @@ impl Session {
             ended_at: None,
             tools: 0,
             message: None,
+            agents: Vec::new(),
+            pending: Vec::new(),
             updated_at: now,
             last_ts: 0,
         }
@@ -102,33 +151,10 @@ impl Session {
         self.tools += 1;
         self.tool = tool.to_string();
 
-        let s = |k: &str| input.get(k).and_then(Value::as_str).unwrap_or("");
-        let file = [s("file_path"), s("notebook_path"), s("path")].into_iter().find(|v| !v.is_empty()).unwrap_or("");
-
-        let (phase, label, detail) = match tool {
-            "Read" | "Grep" | "Glob" | "LS" | "WebFetch" | "WebSearch" | "NotebookRead" => {
-                let d = [basename(file), s("pattern").into(), s("url").into(), s("query").into()]
-                    .into_iter()
-                    .find(|v| !v.is_empty())
-                    .unwrap_or_default();
-                (Some(0), "LEYENDO", d)
-            }
-            "Edit" | "MultiEdit" | "Write" | "NotebookEdit" => {
-                self.diff = Some(make_diff(tool, file, input));
-                (Some(1), "EDITANDO", basename(file))
-            }
-            "Bash" | "PowerShell" => {
-                let cmd = first_line(s("command"), 80);
-                if is_check(&cmd) {
-                    (Some(2), "PROBANDO", cmd)
-                } else {
-                    (None, "EJECUTANDO", cmd)
-                }
-            }
-            "Task" | "Agent" => (None, "DELEGANDO", first_line(s("description"), 80)),
-            "TodoWrite" => (None, "PLANEANDO", String::new()),
-            other => (None, "TRABAJANDO", other.to_string()),
-        };
+        let (phase, label, detail) = describe_tool(tool, input);
+        if phase == Some(1) {
+            self.diff = Some(make_diff(tool, &file_of(input), input));
+        }
         if let Some(p) = phase {
             self.phase = p;
             self.reached[p] = true;
@@ -145,6 +171,38 @@ pub struct ClaudeState {
 
 fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64
+}
+
+fn file_of(input: &Value) -> String {
+    let s = |k: &str| input.get(k).and_then(Value::as_str).unwrap_or("");
+    [s("file_path"), s("notebook_path"), s("path")].into_iter().find(|v| !v.is_empty()).unwrap_or("").to_string()
+}
+
+/// Tool call -> (phase it reaches, Spanish label, current detail).
+fn describe_tool(tool: &str, input: &Value) -> (Option<usize>, &'static str, String) {
+    let s = |k: &str| input.get(k).and_then(Value::as_str).unwrap_or("");
+    let file = file_of(input);
+    match tool {
+        "Read" | "Grep" | "Glob" | "LS" | "WebFetch" | "WebSearch" | "NotebookRead" => {
+            let d = [basename(&file), s("pattern").into(), s("url").into(), s("query").into()]
+                .into_iter()
+                .find(|v| !v.is_empty())
+                .unwrap_or_default();
+            (Some(0), "LEYENDO", d)
+        }
+        "Edit" | "MultiEdit" | "Write" | "NotebookEdit" => (Some(1), "EDITANDO", basename(&file)),
+        "Bash" | "PowerShell" => {
+            let cmd = first_line(s("command"), 80);
+            if is_check(&cmd) {
+                (Some(2), "PROBANDO", cmd)
+            } else {
+                (None, "EJECUTANDO", cmd)
+            }
+        }
+        "Task" | "Agent" => (None, "DELEGANDO", first_line(s("description"), 80)),
+        "TodoWrite" => (None, "PLANEANDO", String::new()),
+        other => (None, "TRABAJANDO", other.to_string()),
+    }
 }
 
 fn basename(p: &str) -> String {
@@ -204,25 +262,37 @@ fn latest(map: &HashMap<String, Session>) -> Option<Session> {
     map.values().max_by_key(|s| s.updated_at).cloned()
 }
 
-/// The island side: apply one hook event.
-pub fn handle(app: &AppHandle, ev: Value) {
+pub(crate) struct Applied {
+    pub changed: bool,
+    pub peek: bool,
+}
+
+fn agent_entry<'a>(s: &'a mut Session, id: &str, kind: &str, now: u64) -> &'a mut Agent {
+    let i = match s.agents.iter().position(|a| a.id == id) {
+        Some(i) => i,
+        None => {
+            s.agents.push(Agent::new(id.to_string(), kind.to_string(), String::new(), now));
+            s.agents.len() - 1
+        }
+    };
+    &mut s.agents[i]
+}
+
+/// Apply one hook event to the session map (pure: no I/O).
+pub(crate) fn apply(map: &mut HashMap<String, Session>, ev: &Value, now: u64) -> Applied {
     let name = ev["hook_event_name"].as_str().unwrap_or("");
     let id = ev["session_id"].as_str().unwrap_or("default").to_string();
-    let now = now_ms();
-    let state = app.state::<ClaudeState>();
-    let mut map = state.sessions.lock().unwrap();
 
     if name == "SessionEnd" {
         map.remove(&id);
-        let _ = app.emit("claude", latest(&map));
-        return;
+        return Applied { changed: true, peek: false };
     }
 
     let s = map.entry(id.clone()).or_insert_with(|| Session::new(id, now));
     // Async hooks may arrive out of order: ignore anything older than what we applied.
     let ts = ev["ts"].as_u64().unwrap_or(now);
     if ts < s.last_ts {
-        return;
+        return Applied { changed: false, peek: false };
     }
     s.last_ts = ts;
     if let Some(cwd) = ev["cwd"].as_str() {
@@ -230,10 +300,46 @@ pub fn handle(app: &AppHandle, ev: Value) {
     }
     s.updated_at = now;
 
+    let agent_id = ev["agent_id"].as_str().filter(|a| !a.is_empty());
+    let agent_kind = ev["agent_type"].as_str().unwrap_or("");
     let mut peek = false;
+
+    // Events fired from inside a subagent only touch that agent.
+    if let (Some(aid), "PreToolUse" | "PostToolUse" | "Notification") = (agent_id, name) {
+        let a = agent_entry(s, aid, agent_kind, now);
+        match name {
+            "PreToolUse" => a.tool_use(ev["tool_name"].as_str().unwrap_or(""), &ev["tool_input"]),
+            "PostToolUse" => {
+                if a.status == "waiting" {
+                    a.status = "working";
+                    a.label = "TRABAJANDO";
+                    a.message = None;
+                }
+            }
+            _ => {
+                let msg = ev["message"].as_str().unwrap_or("");
+                if is_permission(ev, msg) {
+                    a.status = "waiting";
+                    a.label = "ESPERA";
+                    a.message = Some(msg.to_string());
+                    peek = true;
+                }
+            }
+        }
+        return Applied { changed: true, peek };
+    }
+
     match name {
         "UserPromptSubmit" => s.start_task(ev["prompt"].as_str().unwrap_or(""), now),
-        "PreToolUse" => s.tool_use(ev["tool_name"].as_str().unwrap_or(""), &ev["tool_input"], now),
+        "PreToolUse" => {
+            let tool = ev["tool_name"].as_str().unwrap_or("");
+            let input = &ev["tool_input"];
+            if matches!(tool, "Agent" | "Task") {
+                let g = |k: &str| input.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+                s.pending.push((g("subagent_type"), first_line(&g("description"), 80)));
+            }
+            s.tool_use(tool, input, now)
+        }
         "PostToolUse" => {
             if s.status == "waiting" {
                 s.status = "working";
@@ -242,17 +348,30 @@ pub fn handle(app: &AppHandle, ev: Value) {
         }
         "Notification" => {
             let msg = ev["message"].as_str().unwrap_or("");
-            // Only permission prompts matter; idle_prompt fires long after Stop.
-            // Older Claude Code versions send no notification_type: fall back to the text.
-            let is_permission = match ev["notification_type"].as_str() {
-                Some(kind) => kind == "permission_prompt",
-                None => !msg.to_lowercase().contains("waiting for your input"),
-            };
-            if is_permission {
+            if is_permission(ev, msg) {
                 s.status = "waiting";
                 s.label = "ESPERA";
                 s.message = Some(msg.to_string());
                 peek = true;
+            }
+        }
+        "SubagentStart" => {
+            if let Some(aid) = agent_id {
+                let i = s.pending.iter().position(|(k, _)| k == agent_kind).or(if s.pending.is_empty() { None } else { Some(0) });
+                let task = i.map(|i| s.pending.remove(i).1).unwrap_or_default();
+                let a = agent_entry(s, aid, agent_kind, now);
+                if a.task.is_empty() {
+                    a.task = task;
+                }
+            }
+        }
+        "SubagentStop" => {
+            if let Some(aid) = agent_id {
+                let a = agent_entry(s, aid, agent_kind, now);
+                a.status = "done";
+                a.label = "LISTO";
+                a.ended_at = Some(now);
+                a.message = None;
             }
         }
         "Stop" => {
@@ -265,9 +384,29 @@ pub fn handle(app: &AppHandle, ev: Value) {
         }
         _ => {}
     }
+    Applied { changed: true, peek }
+}
+
+/// Only permission prompts matter; idle_prompt fires long after Stop.
+/// Older Claude Code versions send no notification_type: fall back to the text.
+fn is_permission(ev: &Value, msg: &str) -> bool {
+    match ev["notification_type"].as_str() {
+        Some(kind) => kind == "permission_prompt",
+        None => !msg.to_lowercase().contains("waiting for your input"),
+    }
+}
+
+/// The island side: apply one hook event and tell the UI.
+pub fn handle(app: &AppHandle, ev: Value) {
+    let state = app.state::<ClaudeState>();
+    let mut map = state.sessions.lock().unwrap();
+    let r = apply(&mut map, &ev, now_ms());
+    if !r.changed {
+        return;
+    }
     let _ = app.emit("claude", latest(&map));
     drop(map);
-    if peek {
+    if r.peek {
         let _ = app.emit("peek", "claude");
     }
 }
@@ -286,4 +425,140 @@ pub fn claude_hooks(action: String) -> Result<bool, String> {
         _ => {}
     }
     hooks::installed()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    const NOW: u64 = 1_000;
+
+    fn run(evs: Vec<Value>) -> (HashMap<String, Session>, Vec<Applied>) {
+        let mut map = HashMap::new();
+        let mut out = Vec::new();
+        for (i, mut ev) in evs.into_iter().enumerate() {
+            ev["session_id"] = json!("s1");
+            ev["ts"] = json!(i as u64 + 1);
+            out.push(apply(&mut map, &ev, NOW));
+        }
+        (map, out)
+    }
+
+    fn agent_call(desc: &str) -> Value {
+        json!({"hook_event_name":"PreToolUse","tool_name":"Agent",
+               "tool_input":{"description":desc,"subagent_type":"Explore"}})
+    }
+
+    fn start(id: &str) -> Value {
+        json!({"hook_event_name":"SubagentStart","agent_id":id,"agent_type":"Explore"})
+    }
+
+    #[test]
+    fn main_flow_unchanged() {
+        let (map, _) = run(vec![
+            json!({"hook_event_name":"UserPromptSubmit","prompt":"hola"}),
+            json!({"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/a/b.rs"}}),
+            json!({"hook_event_name":"Stop"}),
+        ]);
+        let s = &map["s1"];
+        assert_eq!(s.status, "done");
+        assert_eq!(s.label, "LISTO");
+        assert!(s.agents.is_empty());
+    }
+
+    #[test]
+    fn agent_tool_queues_task_and_start_takes_it() {
+        let (map, _) = run(vec![agent_call("Buscar RAM"), start("a1")]);
+        let s = &map["s1"];
+        assert_eq!(s.agents.len(), 1);
+        assert_eq!(s.agents[0].task, "Buscar RAM");
+        assert_eq!(s.agents[0].status, "working");
+        assert!(s.pending.is_empty());
+    }
+
+    #[test]
+    fn parallel_same_type_fifo() {
+        let (map, _) = run(vec![agent_call("A"), agent_call("B"), start("a1"), start("a2")]);
+        let s = &map["s1"];
+        assert_eq!(s.agents[0].task, "A");
+        assert_eq!(s.agents[1].task, "B");
+    }
+
+    #[test]
+    fn agent_events_do_not_touch_session() {
+        let (map, _) = run(vec![
+            agent_call("X"),
+            start("a1"),
+            json!({"hook_event_name":"PreToolUse","agent_id":"a1","agent_type":"Explore",
+                   "tool_name":"Edit","tool_input":{"file_path":"/a/b.rs","old_string":"x","new_string":"y"}}),
+        ]);
+        let s = &map["s1"];
+        assert_eq!(s.agents[0].label, "EDITANDO");
+        assert_eq!(s.agents[0].tools, 1);
+        assert!(s.diff.is_none());
+        assert_eq!(s.label, "DELEGANDO");
+    }
+
+    #[test]
+    fn unknown_agent_created() {
+        let (map, _) = run(vec![json!({"hook_event_name":"PreToolUse","agent_id":"zz","agent_type":"Plan",
+            "tool_name":"Read","tool_input":{"file_path":"/a/b.rs"}})]);
+        let a = &map["s1"].agents[0];
+        assert_eq!(a.id, "zz");
+        assert_eq!(a.kind, "Plan");
+        assert_eq!(a.task, "");
+    }
+
+    #[test]
+    fn agent_permission_peeks() {
+        let (map, r) = run(vec![
+            start("a1"),
+            json!({"hook_event_name":"Notification","agent_id":"a1","notification_type":"permission_prompt",
+                   "message":"Claude needs your permission to use Bash"}),
+        ]);
+        let a = &map["s1"].agents[0];
+        assert_eq!(a.status, "waiting");
+        assert_eq!(a.label, "ESPERA");
+        assert!(r[1].peek);
+
+        let (map, _) = run(vec![
+            start("a1"),
+            json!({"hook_event_name":"Notification","agent_id":"a1","notification_type":"permission_prompt","message":"m"}),
+            json!({"hook_event_name":"PostToolUse","agent_id":"a1","tool_name":"Bash"}),
+        ]);
+        assert_eq!(map["s1"].agents[0].status, "working");
+    }
+
+    #[test]
+    fn subagent_stop_marks_done() {
+        let (map, _) = run(vec![
+            start("a1"),
+            json!({"hook_event_name":"SubagentStop","agent_id":"a1","agent_type":"Explore"}),
+        ]);
+        let a = &map["s1"].agents[0];
+        assert_eq!(a.status, "done");
+        assert_eq!(a.label, "LISTO");
+        assert_eq!(a.ended_at, Some(NOW));
+    }
+
+    #[test]
+    fn new_prompt_clears_agents() {
+        let (map, _) = run(vec![
+            agent_call("A"),
+            start("a1"),
+            agent_call("B"),
+            json!({"hook_event_name":"UserPromptSubmit","prompt":"otra"}),
+        ]);
+        assert!(map["s1"].agents.is_empty());
+        assert!(map["s1"].pending.is_empty());
+    }
+
+    #[test]
+    fn stale_event_is_dropped() {
+        let mut map = HashMap::new();
+        let ev = |ts: u64| json!({"session_id":"s1","ts":ts,"hook_event_name":"Stop"});
+        assert!(apply(&mut map, &ev(5), NOW).changed);
+        assert!(!apply(&mut map, &ev(4), NOW).changed);
+    }
 }
