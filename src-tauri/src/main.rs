@@ -4,6 +4,8 @@
 mod claude;
 mod focus;
 mod hit;
+#[cfg(target_os = "linux")]
+mod kwin;
 mod media;
 mod notes;
 mod settings;
@@ -155,6 +157,12 @@ fn main() {
                 .build(app)?;
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Dynamic Island");
+        .build(tauri::generate_context!())
+        .expect("error while running Dynamic Island")
+        .run(|_, event| {
+            if let tauri::RunEvent::Exit = event {
+                #[cfg(target_os = "linux")]
+                kwin::stop();
+            }
+        });
 }

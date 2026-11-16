@@ -99,10 +99,12 @@
     settings.position === 'left' ? 0 : settings.position === 'right' ? WIN_W - width : (WIN_W - width) / 2;
   const x = $derived(anchorX(w));
 
-  // Tell the core where the island can be grabbed.
+  // Tell the core where the island can be grabbed (kept for Linux hover too).
+  let hit = { x: 0, y: 0, w: 0, h: 0 };
   $effect(() => {
     const [hw, hh] = open ? [w, h + TOP] : tucked ? [Math.max(w, EDGE.w), EDGE.h] : line ? [LINE.hitW, LINE.hitH] : [w, h + TOP];
-    invoke('set_hit_rect', { x: anchorX(hw), y: 0, w: hw, h: hh, open, busy: acts.length > 0 });
+    hit = { x: anchorX(hw), y: 0, w: hw, h: hh };
+    invoke('set_hit_rect', { ...hit, open, busy: acts.length > 0 });
   });
 
   // Seconds only matter for countdowns / elapsed timers or an open panel.
@@ -178,27 +180,41 @@
     peekT = setTimeout(() => !hovering && collapse(), ms);
   }
 
-  // Linux: the core can't see the global cursor, so hover is detected here. The
-  // window's input region is exactly the island, so any pointer event = inside.
+  // Linux: the core can't see the global cursor, so hover is detected here.
+  // Pointer events may arrive from anywhere in the window (the compositor
+  // doesn't always honour the input region, and WebKitGTK reports leaving at
+  // a point still inside the window), so check them against the hit rect; the
+  // core also sends `pointer-left` when GTK sees the pointer leave.
   // No ghost fade: clicks can't pass through the island itself on Linux.
   let dwellT;
+  let inside = false;
+  const inHit = (e) => e.clientX >= hit.x && e.clientX <= hit.x + hit.w && e.clientY >= hit.y && e.clientY <= hit.y + hit.h;
+  function domLeave() {
+    clearTimeout(dwellT);
+    if (!inside) return;
+    inside = false;
+    onHover('away');
+  }
   function domHover() {
     const root = document.documentElement;
     const activate = () => {
       clearTimeout(dwellT);
       onHover('active');
     };
-    root.addEventListener('pointerenter', (e) => {
-      clearTimeout(leaveT);
-      if (open || e.ctrlKey) return activate();
-      dwellT = setTimeout(activate, acts.length ? settings.dwell_busy : settings.dwell_idle);
-    });
-    root.addEventListener('pointermove', (e) => !open && e.ctrlKey && activate());
-    root.addEventListener('pointerdown', () => !open && activate());
-    root.addEventListener('pointerleave', () => {
-      clearTimeout(dwellT);
-      onHover('away');
-    });
+    const track = (e) => {
+      if (!inHit(e)) return domLeave();
+      if (!inside) {
+        inside = true;
+        clearTimeout(leaveT);
+        if (open || e.ctrlKey) return activate();
+        dwellT = setTimeout(activate, acts.length ? settings.dwell_busy : settings.dwell_idle);
+      } else if (!open && e.ctrlKey) activate();
+    };
+    root.addEventListener('pointerenter', track);
+    root.addEventListener('pointermove', track);
+    root.addEventListener('pointerdown', (e) => inHit(e) && !open && activate());
+    root.addEventListener('pointerleave', domLeave);
+    listen('pointer-left', domLeave);
   }
 
   onMount(() => {

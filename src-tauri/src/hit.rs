@@ -130,9 +130,17 @@ pub fn start(win: WebviewWindow) {
     if hover_native() {
         let _ = win.set_ignore_cursor_events(true);
         track_cursor(win);
-    } else {
-        watch_covered(win);
+        return;
     }
+    #[cfg(target_os = "linux")]
+    {
+        platform::watch_leave(&win);
+        // Plasma Wayland: KWin sees native Wayland windows, X11 doesn't.
+        if crate::kwin::wanted() && crate::kwin::start(win.clone()) {
+            return;
+        }
+    }
+    watch_covered(win);
 }
 
 /// Linux: only the "maximized window in front" check; hover lives in the UI.
@@ -375,6 +383,26 @@ mod platform {
             let Some(gdk) = gw.window() else { return };
             let rect = gtk::cairo::RectangleInt::new(x.floor() as i32, y.floor() as i32, w.ceil() as i32, h.ceil() as i32);
             gdk.input_shape_combine_region(&gtk::cairo::Region::create_rectangle(&rect), 0, 0);
+        });
+    }
+
+    /// The UI can't always tell when the cursor leaves: WebKitGTK reports the
+    /// crossing at a point that may still be inside the (larger) window, so
+    /// the page never sees a `pointerleave`. GTK does see the pointer leave the
+    /// input region; forward that as `pointer-left`.
+    pub fn watch_leave(win: &WebviewWindow) {
+        let w = win.clone();
+        let _ = win.run_on_main_thread(move || {
+            use gtk::{gdk, glib, prelude::*};
+            let Ok(gw) = w.gtk_window() else { return };
+            gw.add_events(gdk::EventMask::LEAVE_NOTIFY_MASK);
+            gw.connect_leave_notify_event(move |_, ev| {
+                // Moving into a child widget (the webview) isn't leaving.
+                if ev.detail() != gdk::NotifyType::Inferior {
+                    let _ = tauri::Emitter::emit(&w, "pointer-left", ());
+                }
+                glib::Propagation::Proceed
+            });
         });
     }
 
