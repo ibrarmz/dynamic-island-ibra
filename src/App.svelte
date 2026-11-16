@@ -234,6 +234,7 @@
   onMount(() => {
     init();
     invoke('hover_native').then((native) => !native && domHover());
+    invoke('covered').then((v) => (covered = v));
     window.addEventListener('blur', onWindowBlur);
     const unlisten = [
       listen('hover', (e) => onHover(e.payload)),

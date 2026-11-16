@@ -87,6 +87,7 @@ fn main() {
             hit::set_hit_rect,
             hit::hover_native,
             hit::release_focus,
+            hit::covered,
             notes::notes_load,
             notes::notes_save,
             sys::sys_stats,

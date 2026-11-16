@@ -2,10 +2,12 @@
 //! native Wayland windows (Konsole, Dolphin, Firefox…) and "a maximized window
 //! is in front" never fires for them. KWin sees every window, so we load a
 //! small KWin script over D-Bus that watches the active window and calls back
-//! into the island's own D-Bus service with `Covered(bool)`.
+//! into the island's own D-Bus service with `Covered(bool)`. The same script
+//! pins the island to the top edge, over a top panel (KWin would otherwise
+//! place it below the panel).
 
 use std::sync::OnceLock;
-use tauri::{Emitter, WebviewWindow};
+use tauri::WebviewWindow;
 use zbus::{blocking::Connection, interface};
 
 const BUS_NAME: &str = "dev.dynamicisland.Island";
@@ -23,7 +25,7 @@ impl Island {
     /// Called by the KWin script when the active window starts / stops
     /// covering the island's monitor (maximized or fullscreen).
     fn covered(&self, covered: bool) {
-        let _ = self.win.emit("covered", covered);
+        crate::hit::set_covered(&self.win, covered);
     }
 }
 
@@ -94,14 +96,39 @@ const ISLAND_PID = {pid};
 let last = null;
 let watched = null;
 
+// GTK/WebKit also map a hidden helper window (off screen at -100,-100) from
+// the same process; only the normal window is the island.
 function isIsland(w) {{
-    return !!w && (w.pid === ISLAND_PID || w.resourceClass === "dynamic-island");
+    return !!w && w.normalWindow
+        && (w.pid === ISLAND_PID || String(w.resourceClass).toLowerCase() === "dynamic-island");
+}}
+
+function island() {{
+    const all = workspace.stackingOrder;
+    for (let i = 0; i < all.length; i++) if (isIsland(all[i])) return all[i];
+    return null;
 }}
 
 function islandOutput() {{
-    const all = workspace.stackingOrder;
-    for (let i = 0; i < all.length; i++) if (isIsland(all[i])) return all[i].output;
-    return null;
+    const w = island();
+    return w ? w.output : null;
+}}
+
+// KWin keeps X11 windows out of panels when it places them, so the island
+// ends up below a top panel. Pin it to the very top of its monitor, over
+// the panel (it already stacks above docks: it's keep-above).
+let pinned = null;
+function pin() {{
+    const w = island();
+    if (!w) return;
+    if (w !== pinned) {{
+        pinned = w;
+        w.frameGeometryChanged.connect(pin);
+        w.outputChanged.connect(pin);
+    }}
+    const top = w.output.geometry.y;
+    const g = w.frameGeometry;
+    if (g.y !== top) w.frameGeometry = {{ x: g.x, y: top, width: g.width, height: g.height }};
 }}
 
 function covers(w) {{
@@ -142,8 +169,10 @@ function watch(w) {{
     }}
 }}
 
+workspace.windowAdded.connect(function (w) {{ if (isIsland(w)) pin(); }});
 workspace.windowActivated.connect(function (w) {{ watch(w); update(); }});
 workspace.windowRemoved.connect(function (w) {{ if (w === watched) watched = null; update(); }});
+pin();
 watch(workspace.activeWindow);
 update();
 "#

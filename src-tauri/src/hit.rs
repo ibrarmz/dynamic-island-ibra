@@ -19,7 +19,10 @@
 //! it only round-trips to the UI thread when a state actually changes.
 
 use std::{
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
+    },
     thread,
     time::{Duration, Instant},
 };
@@ -65,6 +68,19 @@ pub fn set_hit_rect(
     platform::set_input_region(&window, (x, y, w, h));
     #[cfg(not(target_os = "linux"))]
     let _ = window;
+}
+
+/// Last `covered` value, for a UI that starts listening after it was sent.
+static COVERED: AtomicBool = AtomicBool::new(false);
+
+pub fn set_covered(win: &WebviewWindow, covered: bool) {
+    COVERED.store(covered, Ordering::Relaxed);
+    let _ = win.emit("covered", covered);
+}
+
+#[tauri::command]
+pub fn covered() -> bool {
+    COVERED.load(Ordering::Relaxed)
 }
 
 /// Called when the island collapses after the user clicked or typed in it:
@@ -153,7 +169,7 @@ fn watch_covered(win: WebviewWindow) {
             let now = platform::foreground_covers((ox + 10.0, oy + 5.0));
             if now != covered {
                 covered = now;
-                let _ = win.emit("covered", covered);
+                set_covered(&win, covered);
             }
         }
     });
@@ -180,7 +196,7 @@ fn track_cursor(win: WebviewWindow) {
                 let now_covered = platform::foreground_covers((ox + 10.0, oy + 5.0));
                 if now_covered != covered {
                     covered = now_covered;
-                    let _ = win.emit("covered", covered);
+                    set_covered(&win, covered);
                 }
             }
 
