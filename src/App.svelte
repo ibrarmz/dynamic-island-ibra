@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { init, media, focus, claude, clock, fmt, setClockSeconds, settings } from './lib/store.svelte.js';
+  import { init, media, focus, claude, clock, fmt, setClockSeconds, settings, activeAgents, waitingAgent } from './lib/store.svelte.js';
   import { icon } from './lib/icons.js';
   import Pill from './lib/Pill.svelte';
   import Home from './lib/Home.svelte';
@@ -76,11 +76,11 @@
   // What the collapsed pill shows, highest priority first (max two).
   const acts = $derived(
     [
-      cStatus === 'waiting' && 'claude-wait',
+      (cStatus === 'waiting' || waitingAgent()) && 'claude-wait',
       focus.running && 'focus',
       cStatus === 'working' && 'claude-work',
       playing && 'music',
-      doneFresh && 'claude-done',
+      (doneFresh || (cStatus === 'done' && activeAgents().length > 0)) && 'claude-done',
     ]
       .filter(Boolean)
       .slice(0, 2),
@@ -88,7 +88,9 @@
   const line = $derived(!open && acts.length === 0);
   // Claude asking for permission must be seen even behind a maximized window.
   const tucked = $derived(settings.hide_when_covered && !open && covered && cStatus !== 'waiting');
-  const pillW = $derived(acts.length === 2 ? 360 : acts[0] === 'claude-wait' ? 340 : 290);
+  const pillW = $derived(
+    acts.length === 2 ? 360 : acts[0] === 'claude-wait' ? 340 : acts[0]?.startsWith('claude') && activeAgents().length ? 380 : 290,
+  );
   const w = $derived(open ? OPEN.w : line ? LINE.w : pillW);
   const h = $derived(open ? OPEN.h : line ? LINE.h : PILL_H);
   // Slide up leaving 2 px visible.

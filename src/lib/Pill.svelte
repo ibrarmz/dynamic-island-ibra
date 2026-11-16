@@ -1,13 +1,17 @@
 <script>
-  import { media, claude, claudeElapsed, focusRemaining, fmt } from './store.svelte.js';
+  import { media, claude, claudeElapsed, focusRemaining, fmt, activeAgents, waitingAgent } from './store.svelte.js';
   import { icon } from './icons.js';
   import Cover from './Cover.svelte';
 
   // Highest priority first. One activity: full layout. Two: compact, the top one on the right.
   let { acts } = $props();
 
+  const waitAgent = $derived(waitingAgent());
+  const nAgents = $derived(activeAgents().length);
   const waitTool = $derived(
-    (claude.session?.message?.match(/permission to use (\w+)/i)?.[1] ?? claude.session?.tool ?? '').toUpperCase(),
+    waitAgent
+      ? (waitAgent.message?.match(/permission to use (\w+)/i)?.[1] ?? 'PERMISO').toUpperCase()
+      : (claude.session?.message?.match(/permission to use (\w+)/i)?.[1] ?? claude.session?.tool ?? '').toUpperCase(),
   );
 </script>
 
@@ -42,14 +46,27 @@
     <span class="row violet pad">{@html icon('timer', 16, 2)}<span class="tag">FOCUS</span></span>
     <span class="num big">{fmt.mmss(focusRemaining())}</span>
   {:else if acts[0] === 'claude-work'}
-    <span class="row clay pad"><span class="spin">{@html icon('spark', 16, 2)}</span><span class="tag">{claude.session?.label}</span></span>
-    <span class="num big">{fmt.short(claudeElapsed())}</span>
+    {#if nAgents}
+      <span class="row clay pad"><span class="spin">{@html icon('spark', 16, 2)}</span><span class="tag">DELEGANDO</span></span>
+      <span class="row">
+        <span class="badge"><span class="dots"><i></i><i></i><i></i></span><span class="num">{nAgents}</span></span>
+        <span class="num big">{fmt.short(claudeElapsed())}</span>
+      </span>
+    {:else}
+      <span class="row clay pad"><span class="spin">{@html icon('spark', 16, 2)}</span><span class="tag">{claude.session?.label}</span></span>
+      <span class="num big">{fmt.short(claudeElapsed())}</span>
+    {/if}
   {:else if acts[0] === 'claude-wait'}
-    <span class="row pad"><span class="pulse"></span><span class="msg">Claude pide permiso</span></span>
+    <span class="row pad"><span class="pulse"></span><span class="msg">{#if waitAgent}Agente <span class="clay">{waitAgent.kind}</span> pide permiso{:else}Claude pide permiso{/if}</span></span>
     <span class="tag orange">{waitTool}</span>
   {:else if acts[0] === 'claude-done'}
-    <span class="row clay pad">{@html icon('check', 16, 2.2)}<span class="tag">CLAUDE TERMINÓ</span></span>
-    <span class="num big">{fmt.short(claudeElapsed())}</span>
+    {#if nAgents}
+      <span class="row clay pad">{@html icon('check', 16, 2.2)}<span class="tag">LISTO</span></span>
+      <span class="row clay"><span class="spin sm">{@html icon('spark', 11, 2)}</span><span class="tag">{nAgents} {nAgents === 1 ? 'AGENTE SIGUE' : 'AGENTES SIGUEN'}</span></span>
+    {:else}
+      <span class="row clay pad">{@html icon('check', 16, 2.2)}<span class="tag">CLAUDE TERMINÓ</span></span>
+      <span class="num big">{fmt.short(claudeElapsed())}</span>
+    {/if}
   {/if}
 </div>
 
@@ -80,6 +97,29 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+
+  .badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 7px;
+    border-radius: 9px;
+    background: rgba(232, 145, 111, 0.16);
+    color: #e8916f;
+    font-size: 12px;
+  }
+  .dots { display: flex; gap: 2px; }
+  .dots i {
+    display: block;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  .dots i:nth-child(2) { animation-delay: 0.2s; }
+  .dots i:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 
   .spin { display: grid; animation: spin 2.4s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }

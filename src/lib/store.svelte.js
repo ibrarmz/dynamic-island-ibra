@@ -24,6 +24,10 @@ export const claudeCmd = {
     invoke('claude_hooks', { action }).then((v) => (claude.hooks = v)),
 };
 
+// Subagents of the shown session that have not finished yet.
+export const activeAgents = () => (claude.session?.agents ?? []).filter((a) => a.status !== 'done');
+export const waitingAgent = () => activeAgents().find((a) => a.status === 'waiting') ?? null;
+
 export function claudeElapsed() {
   const s = claude.session;
   if (!s) return 0;
