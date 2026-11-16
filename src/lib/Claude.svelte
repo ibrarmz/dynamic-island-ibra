@@ -1,5 +1,6 @@
 <script>
-  import { claude, claudeCmd, claudeElapsed, fmt } from './store.svelte.js';
+  import { claude, claudeCmd, claudeElapsed, clock, fmt } from './store.svelte.js';
+  import { icon } from './icons.js';
 
   const PHASES = ['LEER', 'EDITAR', 'PROBAR', 'LISTO'];
 
@@ -32,6 +33,20 @@
     return tool ? `Claude necesita permiso para usar ${tool}` : m || 'Claude espera tu respuesta';
   });
 
+  // Agent list replaces the centre card unless the session itself waits.
+  const showAgents = $derived(!!s?.agents?.length && s.status !== 'waiting');
+  const rows = $derived.by(() => {
+    const list = s?.agents ?? [];
+    return [...list.filter((a) => a.status !== 'done'), ...list.filter((a) => a.status === 'done')].slice(0, 3);
+  });
+  const agentTool = (a) => (a.message ?? '').match(/permission to use (\w+)/i)?.[1]?.toUpperCase();
+  const agentSub = (a) =>
+    a.status === 'waiting'
+      ? `PIDE PERMISO${agentTool(a) ? ` · ${agentTool(a)}` : ''}`
+      : [a.label, a.detail].filter(Boolean).join(' ');
+  const agentTime = (a) => fmt.short(Math.max(0, ((a.ended_at ?? clock.now) - a.started_at) / 1000));
+  const nAgents = $derived(s?.agents?.length ?? 0);
+
   const showDiff = $derived(s?.diff && (s.label === 'EDITANDO' || s.status === 'done' || !s.detail));
 </script>
 
@@ -46,13 +61,33 @@
     <div class="right">
       <div class="head">
         <div class="prompt" title={s.prompt}>{s.prompt || 'Sesión de Claude Code'}</div>
-        <div class="meta">{s.project}{s.tools ? ` · ${s.tools} tools` : ''}</div>
+        <div class="meta">
+          {#if showAgents}{nAgents} {nAgents === 1 ? 'agente' : 'agentes'} · {s.tools ?? 0} tools{:else}{s.project}{s.tools ? ` · ${s.tools} tools` : ''}{/if}
+        </div>
       </div>
 
       {#if s.status === 'waiting'}
         <div class="card wait">
           <span class="pulse"></span>
           <span><b>{waitText}</b><br /><span class="dim">Responde en la terminal.</span></span>
+        </div>
+      {:else if showAgents}
+        <div class="agents">
+          {#each rows as a (a.id)}
+            <div class="arow {a.status}">
+              <span class="aico">
+                {#if a.status === 'working'}<span class="spin">{@html icon('spark', 14, 2)}</span>
+                {:else if a.status === 'waiting'}<span class="pulse sm"></span>
+                {:else}<span class="check">✓</span>{/if}
+              </span>
+              <span class="akind">{a.kind}</span>
+              <span class="atask">
+                <span class="at">{a.task || 'Subagente'}</span>
+                <span class="as">{agentSub(a)}</span>
+              </span>
+              <span class="atime num">{agentTime(a)}</span>
+            </div>
+          {/each}
         </div>
       {:else if showDiff}
         <div class="card diff">
@@ -72,7 +107,7 @@
         </div>
       {/if}
 
-      <div class="phases">
+      {#if !showAgents}<div class="phases">
         {#each PHASES as p, i}
           <div class="ph">
             <div class="track">
@@ -81,7 +116,7 @@
             <span class:dim={!bars[i]}>{p}</span>
           </div>
         {/each}
-      </div>
+      </div>{/if}
     </div>
   </div>
 {:else}
@@ -167,6 +202,24 @@
     0% { box-shadow: 0 0 0 0 rgba(255, 154, 85, 0.7); }
     100% { box-shadow: 0 0 0 10px rgba(255, 154, 85, 0); }
   }
+
+  .agents { border-radius: 12px; background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); overflow: hidden; }
+  .arow { display: grid; grid-template-columns: 16px 96px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 12px; }
+  .arow + .arow { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+  .arow.done { opacity: 0.6; }
+  .arow.waiting { background: rgba(255, 140, 60, 0.08); }
+  .aico { display: grid; place-items: center; color: #ff9a55; }
+  .spin { display: grid; animation: spin 2.4s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .pulse.sm { width: 8px; height: 8px; }
+  .check { color: #7bd88f; font-size: 13px; font-weight: 700; }
+  .akind { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #f2b89f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .arow.waiting .akind { color: #ffb585; }
+  .atask { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+  .at { font-family: var(--sans); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .as { font-family: var(--mono); font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .arow.waiting .as { color: #ff9a55; }
+  .atime { font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
 
   .phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 2px; }
   .ph { display: flex; flex-direction: column; gap: 7px; font-size: 10.5px; letter-spacing: 0.14em; }
