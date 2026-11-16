@@ -137,6 +137,12 @@ pub async fn island_memory() -> u64 {
     loop {
         let before = family.len();
         for (pid, p) in sys.processes() {
+            // Linux lists every thread as a task whose parent is its process;
+            // a thread's PSS is the whole process's, so counting threads
+            // multiplied the total by the thread count (~50 for WebKit).
+            if p.thread_kind().is_some() {
+                continue;
+            }
             if let Some(parent) = p.parent() {
                 if family.contains(&parent) {
                     family.insert(*pid);
