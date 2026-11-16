@@ -26,7 +26,7 @@
   {:else if kind === 'focus'}
     <span class="row violet">{@html icon('timer', 15, 2)}<span class="num fg">{fmt.mmss(focusRemaining())}</span></span>
   {:else if kind === 'claude-work'}
-    <span class="row clay"><span class="spin">{@html icon('spark', 15, 2)}</span><span class="num fg">{fmt.short(claudeElapsed())}</span></span>
+    <span class="row clay"><span class="spin">{@html icon('spark', 16, 2)}</span><span class="num fg">{fmt.short(claudeElapsed())}</span></span>
   {:else if kind === 'claude-wait'}
     <span class="row"><span class="pulse"></span><span class="tag orange">PERMISO</span></span>
   {:else if kind === 'claude-done'}
@@ -63,7 +63,7 @@
   {:else if acts[0] === 'claude-done'}
     {#if nAgents}
       <span class="row clay pad">{@html icon('check', 16, 2.2)}<span class="tag">LISTO</span></span>
-      <span class="row clay"><span class="spin sm">{@html icon('spark', 11, 2)}</span><span class="tag">{nAgents} {nAgents === 1 ? 'AGENTE SIGUE' : 'AGENTES SIGUEN'}</span></span>
+      <span class="row clay"><span class="spin sm">{@html icon('spark', 12, 2)}</span><span class="tag">{nAgents} {nAgents === 1 ? 'AGENTE SIGUE' : 'AGENTES SIGUEN'}</span></span>
     {:else}
       <span class="row clay pad">{@html icon('check', 16, 2.2)}<span class="tag">CLAUDE TERMINÓ</span></span>
       <span class="num big">{fmt.short(claudeElapsed())}</span>
@@ -122,6 +122,7 @@
   .dots i:nth-child(3) { animation-delay: 0.4s; }
   @keyframes blink { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 
+  /* Rotated icons must have an even size, otherwise their centre lands on a half pixel in the 38px pill and the icon wobbles under software rendering. */
   .spin { display: grid; animation: spin 2.4s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
