@@ -45,7 +45,7 @@ pub fn slim(ev: &Value) -> Value {
     if let Some(ti) = ev.get("tool_input").and_then(Value::as_object) {
         for k in [
             "file_path", "notebook_path", "path", "pattern", "url", "query", "command", "description",
-            "old_string", "new_string", "content", "new_source",
+            "old_string", "new_string", "content", "new_source", "subagent_type",
         ] {
             if let Some(v) = ti.get(k) {
                 input.insert(k.into(), cut(v));
@@ -63,6 +63,8 @@ pub fn slim(ev: &Value) -> Value {
         "cwd": ev.get("cwd"),
         "hook_event_name": ev.get("hook_event_name"),
         "tool_name": ev.get("tool_name"),
+        "agent_id": ev.get("agent_id"),
+        "agent_type": ev.get("agent_type"),
         "prompt": ev.get("prompt").map(cut),
         "message": ev.get("message").map(cut),
         "notification_type": ev.get("notification_type"),
@@ -105,4 +107,20 @@ pub fn socket_path() -> std::path::PathBuf {
 pub fn send(msg: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
     std::os::unix::net::UnixStream::connect(socket_path())?.write_all(msg)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slim_keeps_subagent_fields() {
+        let ev = json!({"hook_event_name":"PreToolUse","session_id":"s","agent_id":"a1","agent_type":"Explore",
+          "tool_name":"Agent","tool_input":{"description":"Buscar","subagent_type":"Explore","prompt":"x"}});
+        let m = slim(&ev);
+        assert_eq!(m["agent_id"], "a1");
+        assert_eq!(m["agent_type"], "Explore");
+        assert_eq!(m["tool_input"]["subagent_type"], "Explore");
+        assert!(m["tool_input"].get("prompt").is_none()); // still slimmed
+    }
 }
