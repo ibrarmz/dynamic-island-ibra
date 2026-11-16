@@ -78,9 +78,9 @@
     [
       (cStatus === 'waiting' || waitingAgent()) && 'claude-wait',
       focus.running && 'focus',
-      cStatus === 'working' && 'claude-work',
+      cStatus === 'working' && !waitingAgent() && 'claude-work',
       playing && 'music',
-      (doneFresh || (cStatus === 'done' && activeAgents().length > 0)) && 'claude-done',
+      !waitingAgent() && (doneFresh || (cStatus === 'done' && activeAgents().length > 0)) && 'claude-done',
     ]
       .filter(Boolean)
       .slice(0, 2),
