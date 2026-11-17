@@ -1,6 +1,6 @@
 [package]
 name = "dynamic-island"
-version = "0.1.7"
+version = "0.1.8"
 description = "Dynamic Island for Windows and Linux"
 edition = "2021"
 default-run = "dynamic-island"
