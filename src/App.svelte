@@ -309,7 +309,7 @@
         {:else if tab === 'settings'}
           <Settings />
         {:else if tab === 'cal'}
-          <Calendar go={(t) => (tab = t)} />
+          <Calendar />
         {:else}
           <Focus />
         {/if}

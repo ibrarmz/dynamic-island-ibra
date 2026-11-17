@@ -567,6 +567,40 @@ pub fn cal_remove(app: AppHandle, id: String) -> Result<crate::settings::Setting
     crate::settings::update(&app, serde_json::json!({ "calendars": calendars }))
 }
 
+/// Asked by the connect screen while it is open: the copied text, but only if
+/// it is an iCal link not added yet. Nothing else from the clipboard ever
+/// leaves this function.
+#[tauri::command]
+pub async fn cal_clipboard(app: AppHandle) -> Option<String> {
+    let text = tauri::async_runtime::spawn_blocking(|| {
+        // One clipboard handle for the whole run (on Linux each one is an X connection).
+        static CLIP: Mutex<Option<arboard::Clipboard>> = Mutex::new(None);
+        let mut clip = CLIP.lock().unwrap();
+        if clip.is_none() {
+            *clip = arboard::Clipboard::new().ok();
+        }
+        clip.as_mut()?.get_text().ok()
+    })
+    .await
+    .ok()??;
+    let url = ical_link(&text)?;
+    let added = crate::settings::get(&app).calendars.iter().any(|c| c.url == url);
+    (!added).then_some(url)
+}
+
+/// A calendar feed link: webcal://, a .ics file, or Google's /calendar/ical/ path.
+fn ical_link(text: &str) -> Option<String> {
+    let t = text.trim();
+    if t.len() > 2000 {
+        return None;
+    }
+    let url = normalize_url(t).ok()?;
+    let lower = url.to_ascii_lowercase();
+    let path = lower.split(['?', '#']).next().unwrap_or("");
+    let webcal = t.get(..9).is_some_and(|p| p.eq_ignore_ascii_case("webcal://"));
+    (webcal || path.ends_with(".ics") || path.contains("calendar.google.com/calendar/ical/")).then_some(url)
+}
+
 #[tauri::command]
 pub fn cal_refresh(app: AppHandle) {
     refresh_now(&app);
@@ -711,5 +745,16 @@ END:VCALENDAR\r
         assert_eq!(normalize_url(" webcal://p01-caldav.icloud.com/x.ics ").unwrap(), "https://p01-caldav.icloud.com/x.ics");
         assert!(normalize_url("http://x.com/a.ics").is_err());
         assert!(normalize_url("javascript:alert(1)").is_err());
+    }
+
+    #[test]
+    fn spots_ical_links_only() {
+        let g = "https://calendar.google.com/calendar/ical/abc%40gmail.com/private-123/basic.ics";
+        assert_eq!(ical_link(&format!("  {g}\n")).as_deref(), Some(g));
+        assert!(ical_link("https://outlook.office365.com/owa/calendar/x/y/calendar.ics").is_some());
+        assert_eq!(ical_link("webcal://p01-caldav.icloud.com/published/2/xyz").as_deref(), Some("https://p01-caldav.icloud.com/published/2/xyz"));
+        assert!(ical_link("https://github.com/ibrarmz").is_none());
+        assert!(ical_link("mi contraseña es 1234").is_none());
+        assert!(ical_link("https://x.com/a.ics y más texto").is_none());
     }
 }

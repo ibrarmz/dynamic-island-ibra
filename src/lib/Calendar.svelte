@@ -1,8 +1,7 @@
 <script>
   import { calendar, calCmd, calDay, calUntil, clock, settings, fmt } from './store.svelte.js';
   import { icon } from './icons.js';
-
-  let { go } = $props();
+  import CalConnect from './CalConnect.svelte';
 
   const today = $derived(new Date(clock.now));
   const events = $derived(calDay(today));
@@ -24,7 +23,7 @@
     return {
       ev: next,
       label: tomorrow ? 'MAÑANA' : 'SIGUIENTE',
-      big: tomorrow || next.start - clock.now > 3 * 3_600_000 ? fmt.hm(new Date(next.start)) : calUntil(next.start - clock.now),
+      big: tomorrow || next.start - clock.now > 3 * 3_600_000 ? fmt.hm24(new Date(next.start)) : calUntil(next.start - clock.now),
     };
   });
 
@@ -50,8 +49,8 @@
 {#if settings.calendars.length === 0}
   <div class="empty">
     <span class="title">Conecta tu calendario</span>
-    <span class="sub">Pega el link iCal secreto de Google Calendar, Outlook o iCloud y verás tus reuniones aquí y en la píldora.</span>
-    <button class="btn" onclick={() => go('settings')}>Ir a Ajustes</button>
+    <span class="sub">Tus reuniones aquí y en la píldora, con botón para unirte. Solo lectura, sin iniciar sesión.</span>
+    <div class="connect-box"><CalConnect compact /></div>
   </div>
 {:else}
   <div class="cal">
@@ -185,9 +184,8 @@
   .round:hover { background: rgba(255, 255, 255, 0.18); }
   .err { margin-top: 6px; font-size: 10.5px; color: #ff9c94; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
+  .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; }
   .empty .title { font-family: var(--sans); font-size: 18px; font-weight: 600; }
   .empty .sub { max-width: 420px; font-family: var(--sans); font-size: 13px; line-height: 1.45; color: var(--dim); }
-  .btn { margin-top: 6px; padding: 7px 16px; border-radius: 16px; font-size: 12px; background: rgba(255, 255, 255, 0.12); }
-  .btn:hover { background: rgba(255, 255, 255, 0.2); }
+  .connect-box { margin-top: 6px; width: 460px; text-align: left; }
 </style>

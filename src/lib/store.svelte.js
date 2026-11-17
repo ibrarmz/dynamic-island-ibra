@@ -43,7 +43,7 @@ export const settings = $state({
   hide_when_covered: true,
   focus_mins: 25,
   break_mins: 5,
-  tabs: ['claude', 'music', 'focus', 'notes', 'sys'],
+  tabs: ['claude', 'music', 'focus', 'notes', 'sys', 'cal'],
   claude_peek: true,
   transparency: 0,
   hd_art: false,
@@ -52,6 +52,7 @@ export const settings = $state({
   cal_peek: true,
   cal_hide_allday: false,
   cal_only_links: false,
+  tabs_v: 1,
 });
 
 export const setSettings = (patch) =>

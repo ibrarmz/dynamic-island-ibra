@@ -40,7 +40,14 @@ pub struct Settings {
     pub cal_hide_allday: bool,
     /// Only events with a meeting link reach the pill.
     pub cal_only_links: bool,
+    /// Which sections this file already knows about. A section added in a later
+    /// version is switched on once (files without the field are 0).
+    #[serde(default)]
+    pub tabs_v: u32,
 }
+
+/// Bump when a section is added to `TABS`, and list it in `sanitize`.
+const TABS_V: u32 = 1;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -61,6 +68,7 @@ impl Default for Settings {
             cal_peek: true,
             cal_hide_allday: false,
             cal_only_links: false,
+            tabs_v: TABS_V,
         }
     }
 }
@@ -76,6 +84,10 @@ impl Settings {
         self.break_mins = self.break_mins.clamp(1, 60);
         // Past 70 % the text loses its backing and becomes hard to read.
         self.transparency = self.transparency.min(70);
+        if self.tabs_v < 1 && !self.tabs.iter().any(|t| t == "cal") {
+            self.tabs.push("cal".into());
+        }
+        self.tabs_v = TABS_V;
         self.tabs.retain(|t| TABS.contains(&t.as_str()));
         self.tabs.dedup();
         self.cal_notify_mins = self.cal_notify_mins.min(120);
@@ -98,6 +110,22 @@ impl Default for SettingsState {
 /// Snapshot of the current settings from anywhere in the core.
 pub fn get(app: &AppHandle) -> Settings {
     app.state::<SettingsState>().current.lock().unwrap().clone()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_sections_show_up_once_after_an_update() {
+        let old: Settings = serde_json::from_str(r#"{"tabs":["music","notes"]}"#).unwrap();
+        let s = old.sanitize();
+        assert_eq!(s.tabs, ["music", "notes", "cal"]);
+        // Hidden afterwards: stays hidden.
+        let hidden: Settings = serde_json::from_value(serde_json::json!({ "tabs": ["music"], "tabs_v": s.tabs_v })).unwrap();
+        assert_eq!(hidden.sanitize().tabs, ["music"]);
+        assert!(Settings::default().sanitize().tabs.contains(&"cal".to_string()));
+    }
 }
 
 pub fn load(app: &AppHandle) {

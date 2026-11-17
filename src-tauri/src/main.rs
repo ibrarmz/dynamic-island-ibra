@@ -109,6 +109,7 @@ fn main() {
             calendar::cal_add,
             calendar::cal_remove,
             calendar::cal_refresh,
+            calendar::cal_clipboard,
             calendar::open_url,
         ])
         .setup(|app| {

@@ -3,6 +3,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { settings, setSettings, claude, claudeCmd, calendar, calCmd, clock } from './store.svelte.js';
   import { icon } from './icons.js';
+  import CalConnect from './CalConnect.svelte';
 
   const SECTIONS = [
     { id: 'claude', label: 'Claude' },
@@ -51,12 +52,6 @@
   const previewTransparency = (e) => (settings.transparency = +e.currentTarget.value);
   const saveTransparency = (e) => set({ transparency: +e.currentTarget.value });
 
-  let icalUrl = $state('');
-  const addCalendar = () =>
-    run('cal', async () => {
-      await calCmd.add(icalUrl);
-      icalUrl = '';
-    });
   const feed = (id) => calendar.feeds.find((f) => f.id === id);
   function ago(ms) {
     if (!ms) return 'sin datos';
@@ -144,14 +139,8 @@
           <button class="x" aria-label="Quitar calendario {c.name}" disabled={busy === 'cal'} onclick={() => run('cal', () => calCmd.remove(c.id))}>{@html icon('x', 12, 2.4)}</button>
         </div>
       {/each}
-      <form class="add" onsubmit={(e) => { e.preventDefault(); addCalendar(); }}>
-        <label for="ical" class="dim">Agregar link iCal secreto</label>
-        <span class="add-row">
-          <input id="ical" type="url" placeholder="https://calendar.google.com/…/basic.ics" bind:value={icalUrl} spellcheck="false" autocomplete="off" />
-          <button class="btn" type="submit" disabled={busy === 'cal' || !icalUrl.trim()}>{busy === 'cal' ? '…' : 'Agregar'}</button>
-        </span>
-      </form>
-      <p class="hint">En Google Calendar: Configuración → tu calendario → «Dirección secreta en formato iCal». Se guarda solo en esta PC y se actualiza cada 5 min.</p>
+      <CalConnect />
+      <p class="hint">El link se guarda solo en esta PC y se actualiza cada 5 min.</p>
       <div class="row">
         <span>Mostrar en la píldora</span>
         <span class="stepper" role="group" aria-label="Minutos antes de mostrar el evento en la píldora">
@@ -304,21 +293,5 @@
   .bad { color: #ff9c94; }
   .x { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 8px; color: var(--dim); }
   .x:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: var(--fg); }
-  .add { display: flex; flex-direction: column; gap: 4px; margin: 2px 0 4px; }
-  .add-row { display: flex; gap: 6px; }
-  .add input {
-    flex: 1;
-    min-width: 0;
-    height: 30px;
-    padding: 0 10px;
-    border-radius: 9px;
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--fg);
-    font: 11.5px var(--mono);
-    user-select: text;
-  }
-  .add input::placeholder { color: var(--faint); }
-  .add input:focus { outline: none; border-color: rgba(255, 255, 255, 0.4); }
   .hint { margin: 0 0 2px; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
 </style>
