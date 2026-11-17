@@ -10,7 +10,7 @@ Xvfb :99 -screen 0 1920x1080x24 >/dev/null 2>&1 &
 sleep 1
 
 dbus-run-session -- bash -c '
-  ISLAND_PEEK=claude "$0/dynamic-island" >/tmp/island.log 2>&1 &
+  ISLAND_PEEK=claude "$0/ibrae" >/tmp/island.log 2>&1 &
   sleep 8
   hook() { echo "$1" | "$0/island-hook"; echo "hook $2 exit=$?"; }
   hook "{\"session_id\":\"s1\",\"cwd\":\"/home/u/dynamic-island\",\"hook_event_name\":\"UserPromptSubmit\",\"prompt\":\"Haz que la isla sea de vidrio\"}" prompt
@@ -19,12 +19,12 @@ dbus-run-session -- bash -c '
   import -window root -crop 760x330+580+0 /out/linux-claude.png && echo "screenshot ok"
   echo "--- processes / memory (PSS) ---"
   total=0
-  for p in $(pgrep -f "dynamic-island|WebKit"); do
+  for p in $(pgrep -f "ibrae|WebKit"); do
     kb=$(awk "/^Pss:/{print \$2}" /proc/$p/smaps_rollup 2>/dev/null || echo 0)
     printf "%-28s %6s kB\n" "$(cat /proc/$p/comm)" "$kb"; total=$((total + ${kb:-0}))
   done
   echo "TOTAL PSS: $((total / 1024)) MB"
   echo "--- second instance must exit immediately ---"
-  timeout 5 "$0/dynamic-island"; echo "second instance exit=$?"
+  timeout 5 "$0/ibrae"; echo "second instance exit=$?"
   echo "--- island log ---"; tail -n 20 /tmp/island.log
 ' "$BIN"

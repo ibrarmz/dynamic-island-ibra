@@ -2,7 +2,7 @@
 //
 // 1. Close any running island, then start one in demo mode with DevTools on:
 //      PowerShell: $env:ISLAND_DEMO=1; $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=9333"
-//                  & src-tauri\target\release\dynamic-island.exe
+//                  & src-tauri\target\release\ibrae.exe
 //    (ISLAND_DEMO: no real music, calendars or Claude sessions get in, and the
 //    real cursor is ignored.)
 // 2. node scripts/record-demo.mjs

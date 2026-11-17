@@ -123,7 +123,7 @@
             {update.installing ? 'Instalando…' : update.can_install ? 'Actualizar' : 'Descargar'}
           </button>
         {:else}
-          <span>Versión {update.current}{update.checked_at ? ' · al día' : ''}</span>
+          <span>IBRÆ {update.current}{update.checked_at ? ' · al día' : ''}</span>
           <button class="btn" disabled={busy === 'update'} onclick={() => run('update', updateCmd.check)}>{busy === 'update' ? 'Buscando…' : 'Buscar'}</button>
         {/if}
       </div>
@@ -223,6 +223,11 @@
       </div>
     </section>
     {#if error}<p class="err">{error}</p>{/if}
+    <footer class="brand" aria-label="Acerca de">
+      <span class="mark">IBRÆ</span>
+      <span>A different layer of your desktop.</span>
+      <span class="sig">DESIGNED BY IBRA · EST. 2026</span>
+    </footer>
   </div>
 </div>
 
@@ -316,5 +321,8 @@
   .bad { color: #ff9c94; }
   .x { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 8px; color: var(--dim); }
   .x:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: var(--fg); }
+  .brand { display: flex; flex-direction: column; gap: 2px; margin: 10px 0 6px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 11.5px; color: var(--dim); }
+  .brand .mark { font-family: var(--sans); font-size: 15px; font-weight: 700; letter-spacing: 0.18em; color: var(--fg); }
+  .brand .sig { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em; color: var(--faint); }
   .hint { margin: 0 0 2px; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
 </style>

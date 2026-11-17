@@ -21,7 +21,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           sed "s/{{VERSION}}/${VERSION}/g" .github/release-notes.md > notes.md
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --title "Dynamic Island ${VERSION}" --notes-file notes.md --verify-tag
+            || gh release create "$GITHUB_REF_NAME" --title "IBRÆ ${VERSION}" --notes-file notes.md --verify-tag
 
   build:
     needs: create-release
@@ -79,22 +79,22 @@ jobs:
           B=src-tauri/target/release/bundle
           mkdir out
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cp "$B/nsis/Dynamic Island_${VERSION}_x64-setup.exe" "out/DynamicIsland_${VERSION}_x64-setup.exe"
-            cp "$B"/msi/*.msi "out/DynamicIsland_${VERSION}_x64.msi"
+            cp "$B/nsis/IBRAE_${VERSION}_x64-setup.exe" "out/IBRAE_${VERSION}_x64-setup.exe"
+            cp "$B"/msi/*.msi "out/IBRAE_${VERSION}_x64.msi"
             # latest.json: what the in-app updater reads (only when signed).
-            SIG="$B/nsis/Dynamic Island_${VERSION}_x64-setup.exe.sig"
+            SIG="$B/nsis/IBRAE_${VERSION}_x64-setup.exe.sig"
             if [ -f "$SIG" ]; then
               node .github/latest-json.mjs "$VERSION" "$SIG" "$(ls "$B"/msi/*.msi.sig)" > out/latest.json
             fi
             # Portable .zip: for networks that block .exe / .msi downloads. No install, no admin.
-            P="out/portable/Dynamic Island"
+            P="out/portable/IBRAE"
             mkdir -p "$P"
-            cp src-tauri/target/release/dynamic-island.exe src-tauri/target/release/island-hook.exe "$P/"
+            cp src-tauri/target/release/ibrae.exe src-tauri/target/release/island-hook.exe "$P/"
             sed "s/{{VERSION}}/${VERSION}/g" .github/portable-LEEME.txt > "$P/LEEME.txt"
-            (cd out/portable && 7z a -tzip -bso0 "../DynamicIsland_${VERSION}_x64-portable.zip" "Dynamic Island")
+            (cd out/portable && 7z a -tzip -bso0 "../IBRAE_${VERSION}_x64-portable.zip" "IBRAE")
             rm -rf out/portable
           else
-            cp "$B/deb/Dynamic Island_${VERSION}_amd64.deb" "out/dynamic-island_${VERSION}_amd64.deb"
-            cp "$B/rpm/Dynamic Island-${VERSION}-1.x86_64.rpm" "out/dynamic-island-${VERSION}-1.x86_64.rpm"
+            cp "$B/deb/IBRAE_${VERSION}_amd64.deb" "out/ibrae_${VERSION}_amd64.deb"
+            cp "$B/rpm/IBRAE-${VERSION}-1.x86_64.rpm" "out/ibrae-${VERSION}-1.x86_64.rpm"
           fi
           gh release upload "$GITHUB_REF_NAME" out/* --clobber

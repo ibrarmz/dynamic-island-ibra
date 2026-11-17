@@ -35,7 +35,8 @@ fn command() -> Result<String, String> {
 
 fn is_ours(hook: &Value) -> bool {
     hook["command"].as_str().is_some_and(|c| {
-        c.contains("island-hook") || (c.contains("dynamic-island") && c.trim_end().ends_with(" hook"))
+        // `ibrae hook` / the pre-rename `dynamic-island hook` fallback.
+        c.contains("island-hook") || ((c.contains("ibrae") || c.contains("dynamic-island")) && c.trim_end().ends_with(" hook"))
     })
 }
 

@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::{sync::Mutex, thread, time::Duration};
 use tauri::{AppHandle, Emitter, Manager, State};
 
-const LATEST_JSON: &str = "https://github.com/ibrarmz/dynamic-island-ibra/releases/latest/download/latest.json";
-pub const RELEASES: &str = "https://github.com/ibrarmz/dynamic-island-ibra/releases/latest";
+const LATEST_JSON: &str = "https://github.com/ibrarmz/ibrae/releases/latest/download/latest.json";
+pub const RELEASES: &str = "https://github.com/ibrarmz/ibrae/releases/latest";
 const EVERY: Duration = Duration::from_secs(12 * 3600);
 
 #[derive(Serialize, Clone, Default, PartialEq)]
@@ -114,7 +114,15 @@ fn can_install() -> bool {
         use tauri::utils::{config::BundleType, platform::bundle_type};
         let exe = std::env::current_exe().ok();
         let nsis = exe.as_ref().and_then(|e| e.parent()).is_some_and(|d| d.join("uninstall.exe").exists());
-        nsis || bundle_type() == Some(BundleType::Msi)
+        // The build marks the plain exe as "msi" too (the last bundle made), and
+        // that exe also goes into the portable .zip: only trust it in Program Files.
+        let in_program_files = exe.as_ref().is_some_and(|e| {
+            ["ProgramW6432", "ProgramFiles"]
+                .iter()
+                .filter_map(std::env::var_os)
+                .any(|pf| e.starts_with(std::path::PathBuf::from(pf)))
+        });
+        nsis || (bundle_type() == Some(BundleType::Msi) && in_program_files)
     }
     #[cfg(not(windows))]
     false

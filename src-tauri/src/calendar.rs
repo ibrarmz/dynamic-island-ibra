@@ -762,7 +762,7 @@ END:VCALENDAR\r
         assert!(normalize_url("javascript:alert(1)").is_err());
     }
 
-    /// A real export, kept out of the repo: ICS_FILE=path cargo test -p dynamic-island real_export -- --ignored --nocapture
+    /// A real export, kept out of the repo: ICS_FILE=path cargo test -p ibrae real_export -- --ignored --nocapture
     /// Prints only counts and times, never titles.
     #[test]
     #[ignore]
@@ -785,7 +785,7 @@ END:VCALENDAR\r
         }
     }
 
-    /// Hits the network: cargo test -p dynamic-island live_google -- --ignored
+    /// Hits the network: cargo test -p ibrae live_google -- --ignored
     #[test]
     #[ignore]
     fn live_google_public_of_a_private_calendar() {

@@ -1,10 +1,11 @@
-# Dynamic Island para escritorio
+<h1 align="center">IBRÆ</h1>
+<p align="center"><em>A different layer of your desktop.</em><br><sub>DESIGNED BY IBRA · EST. 2026</sub></p>
 
 Una isla dinámica para **Windows y Linux** que vive arriba de tu pantalla: lo que suena, lo que hace Claude Code, tu próxima reunión y tus herramientas del día, a un vistazo. Gratis y de código abierto.
 
 <p align="center"><img src="docs/demo.gif" alt="La isla: música en la píldora, Claude Code trabajando y pidiendo permiso, aviso de reunión y los paneles de música, Claude y calendario" width="760"></p>
 
-**[Descargar la última versión](https://github.com/ibrarmz/dynamic-island-ibra/releases/latest)** · Windows 10/11, Debian/Ubuntu, Fedora
+**[Descargar la última versión](https://github.com/ibrarmz/ibrae/releases/latest)** · Windows 10/11, Debian/Ubuntu, Fedora
 
 ## Qué hace
 
@@ -16,25 +17,27 @@ Una isla dinámica para **Windows y Linux** que vive arriba de tu pantalla: lo q
 - **Ligera y privada:** ~150 MB de RAM, casi 0 % de CPU en reposo, sin cuentas ni servidores propios ([qué se conecta a internet](#privacidad-qué-se-conecta-a-internet)).
 - **Se actualiza sola** con firma verificada.
 
-Hecha con **Tauri 2 + Rust + Svelte 5**.
+Hecha con **Tauri 2 + Rust + Svelte 5**. El nombre se escribe IBRÆ y se busca como *ibrae*.
 
 ## Instalar
 
-Descarga el instalador de la [última versión](https://github.com/ibrarmz/dynamic-island-ibra/releases/latest).
+Descarga el instalador de la [última versión](https://github.com/ibrarmz/ibrae/releases/latest).
 
 | Sistema | Archivo | Notas |
 | --- | --- | --- |
-| Windows 10/11 | `DynamicIsland_<versión>_x64-setup.exe` | Recomendado. Instala por usuario, sin permisos de administrador. |
-| Windows 10/11 | `DynamicIsland_<versión>_x64-portable.zip` | Si tu red bloquea descargas de `.exe`/`.msi`. Descomprime y abre `dynamic-island.exe`; no instala ni pide administrador. Instrucciones en `LEEME.txt`. |
-| Windows 10/11 | `DynamicIsland_<versión>_x64.msi` | Para todo el equipo, en Program Files. Pide administrador; útil para desplegar con Intune / GPO (`msiexec /i … /qn`). |
-| Debian / Ubuntu | `dynamic-island_<versión>_amd64.deb` | `sudo apt install ./dynamic-island_<versión>_amd64.deb` |
-| Fedora | `dynamic-island-<versión>-1.x86_64.rpm` | `sudo dnf install ./dynamic-island-<versión>-1.x86_64.rpm` |
+| Windows 10/11 | `IBRAE_<versión>_x64-setup.exe` | Recomendado. Instala por usuario, sin permisos de administrador. |
+| Windows 10/11 | `IBRAE_<versión>_x64-portable.zip` | Si tu red bloquea descargas de `.exe`/`.msi`. Descomprime y abre `ibrae.exe`; no instala ni pide administrador. Instrucciones en `LEEME.txt`. |
+| Windows 10/11 | `IBRAE_<versión>_x64.msi` | Para todo el equipo, en Program Files. Pide administrador; útil para desplegar con Intune / GPO (`msiexec /i … /qn`). |
+| Debian / Ubuntu | `ibrae_<versión>_amd64.deb` | `sudo apt install ./ibrae_<versión>_amd64.deb` |
+| Fedora | `ibrae-<versión>-1.x86_64.rpm` | `sudo dnf install ./ibrae-<versión>-1.x86_64.rpm` |
 
 **Actualizaciones:** la isla revisa GitHub al arrancar y cada 12 horas. Con el instalador `.exe` o el `.msi` se actualiza sola desde **Ajustes → Actualizaciones** (verifica la firma de la descarga antes de instalar); con el `.zip` portable y en Linux te avisa y abre la página de descarga. Se puede apagar en Ajustes.
 
-Usa solo una de las opciones de Windows. Los dos, al desinstalar, quitan los hooks de Claude y el inicio automático (`dynamic-island uninstall-cleanup`). No están firmados: si SmartScreen avisa, "Más información" → "Ejecutar de todas formas".
+Usa solo una de las opciones de Windows. Los dos, al desinstalar, quitan los hooks de Claude y el inicio automático (`ibrae uninstall-cleanup`). No están firmados: si SmartScreen avisa, "Más información" → "Ejecutar de todas formas".
 
-En Linux, antes de desinstalar, corre `dynamic-island hooks uninstall` si conectaste Claude Code y apaga "Iniciar con el sistema" en Ajustes: el paquete se desinstala como root y no puede tocar la configuración de tu usuario.
+**¿Venías de "Dynamic Island"?** Es la misma app con nombre nuevo. En Windows, al abrir IBRÆ por primera vez (o al actualizar desde la isla) se quita la versión anterior y se conservan tus notas, ajustes, calendarios, la conexión con Claude Code y el inicio automático. En Linux quita el paquete viejo con `sudo apt remove dynamic-island` / `sudo dnf remove dynamic-island`.
+
+En Linux, antes de desinstalar, corre `ibrae hooks uninstall` si conectaste Claude Code y apaga "Iniciar con el sistema" en Ajustes: el paquete se desinstala como root y no puede tocar la configuración de tu usuario.
 
 ## Compilar
 
@@ -95,7 +98,7 @@ Sección **Calendario** (o Ajustes → Calendario) → **Google Calendar** u **O
 
 ### Conectar Claude Code
 
-En la isla, sección **Claude** → **Conectar**. Eso agrega hooks a `~/.claude/settings.json` (guarda antes un respaldo `settings.json.bak-dynamic-island`) y aplica a las sesiones nuevas de Claude Code. También desde terminal: `dynamic-island hooks install` / `hooks uninstall`.
+En la isla, sección **Claude** → **Conectar**. Eso agrega hooks a `~/.claude/settings.json` (guarda antes un respaldo `settings.json.bak-dynamic-island`) y aplica a las sesiones nuevas de Claude Code. También desde terminal: `ibrae hooks install` / `hooks uninstall`.
 
 Los hooks llaman a `island-hook`, un ejecutable de 200 KB que solo reenvía el evento por un canal local (named pipe en Windows, socket Unix en Linux; nada de puertos de red). Van con `"async": true`, así que Claude nunca espera a la isla.
 

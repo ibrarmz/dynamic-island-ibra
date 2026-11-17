@@ -202,12 +202,50 @@ pub fn settings_set(app: AppHandle, patch: Value) -> Result<Settings, String> {
     update(&app, patch)
 }
 
-/// Name the autostart plugin registers under (the product name).
-const AUTOSTART_NAME: &str = "Dynamic Island";
+/// Name the autostart plugin registers under (the product name), and the one
+/// used before the rename to IBRAE.
+const AUTOSTART_NAME: &str = "IBRAE";
+pub const LEGACY_AUTOSTART_NAME: &str = "Dynamic Island";
 
 /// Used by the uninstallers, without a running app: drop the "start with the
 /// system" entry so it doesn't point at a deleted executable.
 pub fn remove_autostart_entry() {
+    remove_autostart_named(AUTOSTART_NAME);
+    remove_autostart_named(LEGACY_AUTOSTART_NAME);
+}
+
+/// Whether a "start with the system" entry exists under `name`.
+pub fn autostart_entry_exists(name: &str) -> bool {
+    #[cfg(windows)]
+    unsafe {
+        use windows::{
+            core::{w, HSTRING},
+            Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_ANY},
+        };
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            w!(r"Software\Microsoft\Windows\CurrentVersion\Run"),
+            &HSTRING::from(name),
+            RRF_RT_ANY,
+            None,
+            None,
+            None,
+        )
+        .is_ok()
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::env::var_os("HOME")
+            .is_some_and(|h| PathBuf::from(h).join(".config/autostart").join(format!("{name}.desktop")).exists())
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        let _ = name;
+        false
+    }
+}
+
+pub fn remove_autostart_named(name: &str) {
     #[cfg(windows)]
     unsafe {
         use windows::{
@@ -217,12 +255,12 @@ pub fn remove_autostart_entry() {
         let _ = RegDeleteKeyValueW(
             HKEY_CURRENT_USER,
             w!(r"Software\Microsoft\Windows\CurrentVersion\Run"),
-            &HSTRING::from(AUTOSTART_NAME),
+            &HSTRING::from(name),
         );
     }
     #[cfg(target_os = "linux")]
     if let Some(home) = std::env::var_os("HOME") {
-        let file = PathBuf::from(home).join(".config/autostart").join(format!("{AUTOSTART_NAME}.desktop"));
+        let file = PathBuf::from(home).join(".config/autostart").join(format!("{name}.desktop"));
         let _ = fs::remove_file(file);
     }
 }

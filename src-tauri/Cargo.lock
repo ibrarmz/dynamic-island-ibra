@@ -978,32 +978,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
-name = "dynamic-island"
-version = "0.1.15"
-dependencies = [
- "arboard",
- "base64 0.22.1",
- "chrono",
- "chrono-tz",
- "gtk",
- "image",
- "rrule",
- "serde",
- "serde_json",
- "sysinfo",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-notification",
- "tauri-plugin-updater",
- "ureq",
- "webkit2gtk",
- "windows",
- "x11rb",
- "zbus 5.19.0",
-]
-
-[[package]]
 name = "embed-resource"
 version = "3.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1779,6 +1753,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "ibrae"
+version = "0.1.15"
+dependencies = [
+ "arboard",
+ "base64 0.22.1",
+ "chrono",
+ "chrono-tz",
+ "gtk",
+ "image",
+ "rrule",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-notification",
+ "tauri-plugin-updater",
+ "ureq",
+ "webkit2gtk",
+ "windows",
+ "x11rb",
+ "zbus 5.19.0",
 ]
 
 [[package]]

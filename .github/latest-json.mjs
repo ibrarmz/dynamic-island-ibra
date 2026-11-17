@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 
 const [version, exeSig, msiSig] = process.argv.slice(2);
-const repo = process.env.GITHUB_REPOSITORY || 'ibrarmz/dynamic-island-ibra';
+const repo = process.env.GITHUB_REPOSITORY || 'ibrarmz/ibrae';
 const base = `https://github.com/${repo}/releases/download/v${version}`;
 const sig = (f) => readFileSync(f, 'utf8').trim();
 
@@ -12,11 +12,11 @@ console.log(
   JSON.stringify(
     {
       version,
-      notes: `Dynamic Island ${version}`,
+      notes: `IBRÆ ${version}`,
       pub_date: new Date().toISOString(),
       platforms: {
-        'windows-x86_64-nsis': { signature: sig(exeSig), url: `${base}/DynamicIsland_${version}_x64-setup.exe` },
-        'windows-x86_64-msi': { signature: sig(msiSig), url: `${base}/DynamicIsland_${version}_x64.msi` },
+        'windows-x86_64-nsis': { signature: sig(exeSig), url: `${base}/IBRAE_${version}_x64-setup.exe` },
+        'windows-x86_64-msi': { signature: sig(msiSig), url: `${base}/IBRAE_${version}_x64.msi` },
       },
     },
     null,

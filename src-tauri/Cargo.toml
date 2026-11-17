@@ -1,11 +1,11 @@
 [package]
-name = "dynamic-island"
+name = "ibrae"
 version = "0.1.15"
-description = "Dynamic Island for Windows and Linux"
+description = "IBRAE: a different layer of your desktop (Windows and Linux)"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/ibrarmz/dynamic-island-ibra"
-default-run = "dynamic-island"
+repository = "https://github.com/ibrarmz/ibrae"
+default-run = "ibrae"
 
 [workspace]
 members = ["hook"]

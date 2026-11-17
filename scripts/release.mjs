@@ -33,14 +33,14 @@ edit('package.json', setJsonVersion);
 edit('src-tauri/tauri.conf.json', setJsonVersion);
 // Only the [package] version (the first one in the file), not dependency versions.
 edit('src-tauri/Cargo.toml', (t) => t.replace(/^version = "[^"]+"/m, `version = "${version}"`));
-edit('package-lock.json', (t) => t.replace(/("name": "dynamic-island",\s*"version":\s*")[^"]+(")/g, `$1${version}$2`));
+edit('package-lock.json', (t) => t.replace(/("name": "ibrae-desktop",\s*"version":\s*")[^"]+(")/g, `$1${version}$2`));
 
 // Refresh Cargo.lock's entry for the app without touching dependencies.
 execFileSync('cargo', ['update', '--workspace', '--offline'], { cwd: join(root, 'src-tauri'), stdio: 'inherit' });
 
 git('add', 'package.json', 'package-lock.json', 'src-tauri/tauri.conf.json', 'src-tauri/Cargo.toml', 'src-tauri/Cargo.lock');
 git('commit', '-m', `release: v${version}`);
-git('tag', '-a', `v${version}`, '-m', `Dynamic Island ${version}`);
+git('tag', '-a', `v${version}`, '-m', `IBRÆ ${version}`);
 execFileSync('git', ['push', 'origin', 'HEAD', `v${version}`], { cwd: root, stdio: 'inherit' });
 console.log(`\nv${version} publicada. GitHub está compilando los instaladores:`);
-console.log('https://github.com/ibrarmz/dynamic-island-ibra/actions');
+console.log('https://github.com/ibrarmz/ibrae/actions');

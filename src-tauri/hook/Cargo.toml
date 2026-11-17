@@ -1,7 +1,7 @@
 [package]
 name = "island-hook"
 version = "0.1.0"
-description = "Tiny hook client that forwards Claude Code events to Dynamic Island"
+description = "Tiny hook client that forwards Claude Code events to IBRAE"
 edition = "2021"
 publish = false
 

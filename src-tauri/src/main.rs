@@ -8,6 +8,7 @@ mod hit;
 #[cfg(target_os = "linux")]
 mod kwin;
 mod media;
+mod migrate;
 mod notes;
 mod settings;
 mod sys;
@@ -35,7 +36,7 @@ fn main() {
             let result = match std::env::args().nth(2).as_deref() {
                 Some("install") => claude::hooks::install(),
                 Some("uninstall") => claude::hooks::uninstall(),
-                _ => Err("uso: dynamic-island hooks install|uninstall".into()),
+                _ => Err("uso: ibrae hooks install|uninstall".into()),
             };
             if let Err(e) = result {
                 eprintln!("{e}");
@@ -67,12 +68,19 @@ fn main() {
     let demo = std::env::var_os("ISLAND_DEMO").is_some();
 
     // Claim the local channel; if another island owns it, this one isn't needed.
-    let claimed = demo
-        || claude::ipc::serve(|bytes| {
+    let serve = || {
+        claude::ipc::serve(|bytes| {
             if let (Some(app), Ok(ev)) = (APP.get(), serde_json::from_slice(&bytes)) {
                 claude::handle(app, ev);
             }
-        });
+        })
+    };
+    let mut claimed = demo || serve();
+    // Unless the owner is the pre-rename "Dynamic Island": IBRAE replaces it.
+    if !claimed && migrate::stop_legacy_island() {
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        claimed = serve();
+    }
     if !claimed {
         return;
     }
@@ -145,6 +153,7 @@ fn main() {
                 hit::start(win.clone());
             }
             if !demo {
+                migrate::start(app.handle().clone());
                 media::start(app.handle().clone());
                 calendar::start(app.handle().clone());
                 update::start(app.handle().clone());
@@ -168,7 +177,7 @@ fn main() {
             let menu = Menu::with_items(app, &[&settings_item, &toggle, &sep, &quit])?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().cloned().expect("icon"))
-                .tooltip("Dynamic Island")
+                .tooltip("IBRÆ")
                 .menu(&menu)
                 .on_menu_event(|app, event| {
                     let win = app.get_webview_window("island");
@@ -196,7 +205,7 @@ fn main() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while running Dynamic Island")
+        .expect("error while running IBRAE")
         .run(|_, event| {
             if let tauri::RunEvent::Exit = event {
                 #[cfg(target_os = "linux")]

@@ -1,7 +1,7 @@
 //! The Claude Code side of the hook: read the event from stdin, keep only what
 //! the island uses, and hand it over the local channel. Shared verbatim by the
 //! tiny `island-hook` binary (std + serde_json only, so it starts in a few ms)
-//! and by `dynamic-island hook`. Never fails loudly: if the island isn't
+//! and by `ibrae hook`. Never fails loudly: if the island isn't
 //! running, Claude Code must not notice.
 
 use serde_json::{json, Map, Value};
@@ -73,6 +73,7 @@ pub fn slim(ev: &Value) -> Value {
 }
 
 #[cfg(windows)]
+// Kept from the "Dynamic Island" days so old hooks and islands still talk.
 pub const PIPE_NAME: &str = r"\\.\pipe\dynamic-island";
 
 #[cfg(windows)]

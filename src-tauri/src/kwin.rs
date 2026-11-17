@@ -90,7 +90,7 @@ where
 
 fn script(pid: u32) -> String {
     format!(
-        r#"// Loaded by Dynamic Island. Tells it when the active window is maximized or
+        r#"// Loaded by IBRAE. Tells it when the active window is maximized or
 // fullscreen on the island's monitor.
 const ISLAND_PID = {pid};
 let last = null;
@@ -100,7 +100,7 @@ let watched = null;
 // the same process; only the normal window is the island.
 function isIsland(w) {{
     return !!w && w.normalWindow
-        && (w.pid === ISLAND_PID || String(w.resourceClass).toLowerCase() === "dynamic-island");
+        && (w.pid === ISLAND_PID || ["ibrae", "dynamic-island"].includes(String(w.resourceClass).toLowerCase()));
 }}
 
 function island() {{
