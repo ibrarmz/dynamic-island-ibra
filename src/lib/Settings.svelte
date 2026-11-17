@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { settings, setSettings, claude, claudeCmd } from './store.svelte.js';
+  import { settings, setSettings, claude, claudeCmd, calendar, calCmd, clock } from './store.svelte.js';
   import { icon } from './icons.js';
 
   const SECTIONS = [
@@ -10,6 +10,7 @@
     { id: 'focus', label: 'Focus' },
     { id: 'notes', label: 'Notas' },
     { id: 'sys', label: 'Sistema' },
+    { id: 'cal', label: 'Calendario' },
   ];
   const POSITIONS = [
     { id: 'left', label: 'Izquierda' },
@@ -49,6 +50,19 @@
   // Preview while dragging (the store mirror drives the island), save on release.
   const previewTransparency = (e) => (settings.transparency = +e.currentTarget.value);
   const saveTransparency = (e) => set({ transparency: +e.currentTarget.value });
+
+  let icalUrl = $state('');
+  const addCalendar = () =>
+    run('cal', async () => {
+      await calCmd.add(icalUrl);
+      icalUrl = '';
+    });
+  const feed = (id) => calendar.feeds.find((f) => f.id === id);
+  function ago(ms) {
+    if (!ms) return 'sin datos';
+    const m = Math.floor((clock.now - ms) / 60_000);
+    return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : `hace ${Math.floor(m / 60)} h`;
+  }
 
   function toggleSection(id) {
     const on = settings.tabs.includes(id);
@@ -116,6 +130,47 @@
       <div class="row">
         <span>Esconder con ventanas maximizadas</span>
         {@render toggle(settings.hide_when_covered, 'Esconder con ventanas maximizadas', () => set({ hide_when_covered: !settings.hide_when_covered }))}
+      </div>
+    </section>
+
+    <section>
+      <h3 class="label">CALENDARIO</h3>
+      {#each settings.calendars as c (c.id)}
+        {@const f = feed(c.id)}
+        <div class="cal-row">
+          <span class="cdot" style="background:{c.color}"></span>
+          <span class="cname" title={c.name}>{c.name}</span>
+          <span class="dim" class:bad={f?.error} title={f?.error ?? ''}>{f?.error ? 'error' : ago(f?.updated)}</span>
+          <button class="x" aria-label="Quitar calendario {c.name}" disabled={busy === 'cal'} onclick={() => run('cal', () => calCmd.remove(c.id))}>{@html icon('x', 12, 2.4)}</button>
+        </div>
+      {/each}
+      <form class="add" onsubmit={(e) => { e.preventDefault(); addCalendar(); }}>
+        <label for="ical" class="dim">Agregar link iCal secreto</label>
+        <span class="add-row">
+          <input id="ical" type="url" placeholder="https://calendar.google.com/…/basic.ics" bind:value={icalUrl} spellcheck="false" autocomplete="off" />
+          <button class="btn" type="submit" disabled={busy === 'cal' || !icalUrl.trim()}>{busy === 'cal' ? '…' : 'Agregar'}</button>
+        </span>
+      </form>
+      <p class="hint">En Google Calendar: Configuración → tu calendario → «Dirección secreta en formato iCal». Se guarda solo en esta PC y se actualiza cada 5 min.</p>
+      <div class="row">
+        <span>Mostrar en la píldora</span>
+        <span class="stepper" role="group" aria-label="Minutos antes de mostrar el evento en la píldora">
+          <button aria-label="Menos" onclick={() => step('cal_notify_mins', -5, 0, 60)} disabled={settings.cal_notify_mins <= 0}>{@html icon('minus', 14, 2)}</button>
+          <span class="num">{settings.cal_notify_mins ? `${settings.cal_notify_mins} min` : 'No'}</span>
+          <button aria-label="Más" onclick={() => step('cal_notify_mins', 5, 0, 60)} disabled={settings.cal_notify_mins >= 60}>{@html icon('plus', 14, 2)}</button>
+        </span>
+      </div>
+      <div class="row">
+        <span>Aviso grande 1 min antes</span>
+        {@render toggle(settings.cal_peek, 'Aviso grande 1 minuto antes', () => set({ cal_peek: !settings.cal_peek }))}
+      </div>
+      <div class="row">
+        <span>Ocultar eventos de todo el día</span>
+        {@render toggle(settings.cal_hide_allday, 'Ocultar eventos de todo el día', () => set({ cal_hide_allday: !settings.cal_hide_allday }))}
+      </div>
+      <div class="row">
+        <span>Avisar solo si hay videollamada</span>
+        {@render toggle(settings.cal_only_links, 'Avisar solo eventos con videollamada', () => set({ cal_only_links: !settings.cal_only_links }))}
       </div>
     </section>
   </div>
@@ -243,5 +298,27 @@
   .btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
   button:disabled { opacity: 0.45; cursor: default; }
   .err { color: #ff9c94; font-size: 12px; }
+  .cal-row { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 4px 0 10px; margin-bottom: 4px; border-radius: 9px; background: rgba(255, 255, 255, 0.06); font-size: 12.5px; }
+  .cdot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .cname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bad { color: #ff9c94; }
+  .x { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 8px; color: var(--dim); }
+  .x:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: var(--fg); }
+  .add { display: flex; flex-direction: column; gap: 4px; margin: 2px 0 4px; }
+  .add-row { display: flex; gap: 6px; }
+  .add input {
+    flex: 1;
+    min-width: 0;
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--fg);
+    font: 11.5px var(--mono);
+    user-select: text;
+  }
+  .add input::placeholder { color: var(--faint); }
+  .add input:focus { outline: none; border-color: rgba(255, 255, 255, 0.4); }
   .hint { margin: 0 0 2px; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
 </style>

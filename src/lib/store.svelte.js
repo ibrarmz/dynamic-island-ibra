@@ -47,6 +47,11 @@ export const settings = $state({
   claude_peek: true,
   transparency: 0,
   hd_art: false,
+  calendars: [],
+  cal_notify_mins: 15,
+  cal_peek: true,
+  cal_hide_allday: false,
+  cal_only_links: false,
 });
 
 export const setSettings = (patch) =>
@@ -66,6 +71,8 @@ export async function init() {
   await listen('media', (e) => (media.track = e.payload));
   await listen('media-art', (e) => (media.art = e.payload));
   await listen('focus', (e) => Object.assign(focus, e.payload));
+  Object.assign(calendar, await invoke('cal_snapshot'));
+  await listen('calendar', (e) => Object.assign(calendar, e.payload));
 
   tick();
 }
@@ -102,6 +109,61 @@ export const focusCmd = {
   minutes: (minutes) => invoke('focus_minutes', { minutes }),
 };
 
+// Calendar: occurrences from yesterday to tomorrow (epoch ms), plus each feed's status.
+export const calendar = $state({ events: [], feeds: [], dismissed: [] });
+
+export const calCmd = {
+  add: (url) => invoke('cal_add', { url }).then((s) => Object.assign(settings, s)),
+  remove: (id) => invoke('cal_remove', { id }).then((s) => Object.assign(settings, s)),
+  refresh: () => invoke('cal_refresh'),
+  open: (url) => invoke('open_url', { url }),
+  dismiss: (id) => calendar.dismissed.push(id),
+};
+
+const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+/** Events touching the given day, honouring "ocultar todo el día". */
+export function calDay(day) {
+  const start = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+  const end = start + 86_400_000;
+  return calendar.events.filter(
+    (e) => e.start < end && (e.end > start || (e.end === e.start && e.start >= start)) && !(e.all_day && settings.cal_hide_allday),
+  );
+}
+
+/** Timed events that may reach the pill. */
+const alertable = () => calendar.events.filter((e) => !e.all_day && (!settings.cal_only_links || e.link));
+
+/**
+ * What the pill should say about the calendar right now:
+ * { kind: 'alert' | 'next' | 'now', ev } or null.
+ * alert: a minute before until two minutes in (unless dismissed);
+ * next: within cal_notify_mins; now: in progress.
+ */
+export function calPill() {
+  const now = clock.now;
+  const evs = alertable();
+  if (settings.cal_peek) {
+    const a = evs.find((e) => e.start - now <= 60_000 && now < e.start + 120_000 && now < e.end && !calendar.dismissed.includes(e.id));
+    if (a) return { kind: 'alert', ev: a };
+  }
+  const n = settings.cal_notify_mins > 0 && evs.find((e) => e.start > now && e.start - now <= settings.cal_notify_mins * 60_000);
+  if (n) return { kind: 'next', ev: n };
+  const cur = evs.filter((e) => e.start <= now && now < e.end).at(-1);
+  return cur ? { kind: 'now', ev: cur } : null;
+}
+
+/** "en 12 min", "en 1 h 5 min", "ya empezó". */
+export function calUntil(ms) {
+  const m = Math.ceil(ms / 60_000);
+  if (m <= 0) return 'ya empezó';
+  if (m < 60) return `en ${m} min`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `en ${h} h ${m % 60} min` : `en ${h} h`;
+}
+
+export const calSameDay = sameDay;
+
 export const mediaCmd = (cmd) => invoke('media_control', { cmd });
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -115,6 +177,8 @@ export const fmt = {
   },
   short: (sec) => `${Math.floor(sec / 60)}:${pad(Math.floor(sec % 60))}`,
   hm: (d) => d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }),
+  // Calendar times: always "09:30", so agenda columns line up.
+  hm24: (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`,
   dateTag: (d) => `${DAYS[d.getDay()]} ${pad(d.getDate())} ${MONTHS[d.getMonth()]}`,
   dateLong: (d) => d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' }),
 };

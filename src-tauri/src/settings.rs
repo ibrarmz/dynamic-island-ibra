@@ -7,7 +7,7 @@ use serde_json::Value;
 use std::{fs, path::PathBuf, sync::Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 
-pub const TABS: [&str; 5] = ["claude", "music", "focus", "notes", "sys"];
+pub const TABS: [&str; 6] = ["claude", "music", "focus", "notes", "sys", "cal"];
 
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
 #[serde(default)]
@@ -31,6 +31,15 @@ pub struct Settings {
     pub transparency: u32,
     /// Look up HD covers in the iTunes catalog (sends artist + title). Opt-in.
     pub hd_art: bool,
+    /// iCal feeds (the links are secrets: they only live in this file).
+    pub calendars: Vec<crate::calendar::Source>,
+    /// Show the next event in the pill this many minutes before (0 = never).
+    pub cal_notify_mins: u32,
+    /// Grow the pill into a "join" card a minute before an event.
+    pub cal_peek: bool,
+    pub cal_hide_allday: bool,
+    /// Only events with a meeting link reach the pill.
+    pub cal_only_links: bool,
 }
 
 impl Default for Settings {
@@ -47,6 +56,11 @@ impl Default for Settings {
             claude_peek: true,
             transparency: 0,
             hd_art: false,
+            calendars: Vec::new(),
+            cal_notify_mins: 15,
+            cal_peek: true,
+            cal_hide_allday: false,
+            cal_only_links: false,
         }
     }
 }
@@ -64,6 +78,8 @@ impl Settings {
         self.transparency = self.transparency.min(70);
         self.tabs.retain(|t| TABS.contains(&t.as_str()));
         self.tabs.dedup();
+        self.cal_notify_mins = self.cal_notify_mins.min(120);
+        self.calendars.retain(|c| !c.id.is_empty() && c.url.starts_with("https://"));
         self
     }
 }
@@ -133,6 +149,9 @@ pub fn update(app: &AppHandle, patch: Value) -> Result<Settings, String> {
         }
         if before.focus_mins != after.focus_mins || before.break_mins != after.break_mins {
             crate::focus::apply_defaults(app, after.focus_mins, after.break_mins);
+        }
+        if before.calendars != after.calendars {
+            crate::calendar::refresh_now(app);
         }
         if after.hd_art && !before.hd_art {
             crate::media::upgrade_current(app);

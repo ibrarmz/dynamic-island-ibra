@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { init, media, focus, claude, clock, fmt, setClockSeconds, settings, activeAgents, waitingAgent } from './lib/store.svelte.js';
+  import { init, media, focus, claude, clock, fmt, setClockSeconds, settings, activeAgents, waitingAgent, calPill, calCmd } from './lib/store.svelte.js';
   import { icon } from './lib/icons.js';
   import Pill from './lib/Pill.svelte';
   import Home from './lib/Home.svelte';
@@ -12,6 +12,7 @@
   import Notes from './lib/Notes.svelte';
   import System from './lib/System.svelte';
   import Settings from './lib/Settings.svelte';
+  import Calendar from './lib/Calendar.svelte';
 
   // Must match WIN_W in src-tauri/src/hit.rs
   const WIN_W = 760;
@@ -19,6 +20,8 @@
   const TOP = 0;
   const OPEN = { w: 720, h: 292 };
   const PILL_H = 38;
+  // Meeting about to start: the pill becomes a small card.
+  const ALERT_H = 84;
 
   const TABS = [
     { id: 'home', label: 'INICIO', icon: 'home' },
@@ -27,6 +30,7 @@
     { id: 'focus', label: 'FOCUS', icon: 'timer' },
     { id: 'notes', label: 'NOTAS', icon: 'note' },
     { id: 'sys', label: 'SISTEMA', icon: 'cpu' },
+    { id: 'cal', label: 'CALENDARIO', icon: 'cal' },
     { id: 'settings', label: 'AJUSTES', icon: 'gear' },
   ];
   // Inicio and Ajustes are always there; the rest can be hidden in Ajustes.
@@ -73,26 +77,32 @@
     }
   });
 
-  // What the collapsed pill shows, highest priority first (max two).
-  const acts = $derived(
-    [
+  const cal = $derived(calPill());
+
+  // What the collapsed pill shows, highest priority first (max two). A meeting
+  // about to start takes the whole pill (it grows into a card with "Unirse").
+  const acts = $derived.by(() => {
+    const list = [
       (cStatus === 'waiting' || waitingAgent()) && 'claude-wait',
+      cal?.kind === 'alert' && 'cal-alert',
       focus.running && 'focus',
       cStatus === 'working' && !waitingAgent() && 'claude-work',
+      cal?.kind === 'next' && 'cal-next',
       playing && 'music',
+      cal?.kind === 'now' && 'cal-now',
       !waitingAgent() && (doneFresh || (cStatus === 'done' && activeAgents().length > 0)) && 'claude-done',
-    ]
-      .filter(Boolean)
-      .slice(0, 2),
-  );
+    ].filter(Boolean);
+    return list[0] === 'cal-alert' ? ['cal-alert'] : list.filter((a) => a !== 'cal-alert').slice(0, 2);
+  });
+  const alert = $derived(!open && acts[0] === 'cal-alert');
   const line = $derived(!open && acts.length === 0);
   // Claude asking for permission must be seen even behind a maximized window.
-  const tucked = $derived(settings.hide_when_covered && !open && covered && cStatus !== 'waiting' && !waitingAgent());
+  const tucked = $derived(settings.hide_when_covered && !open && covered && cStatus !== 'waiting' && !waitingAgent() && !alert);
   const pillW = $derived(
-    acts.length === 2 ? 360 : acts[0] === 'claude-wait' ? 340 : acts[0]?.startsWith('claude') && activeAgents().length ? 380 : 290,
+    alert ? 460 : acts.length === 2 ? 360 : acts[0] === 'claude-wait' ? 340 : acts[0]?.startsWith('claude') && activeAgents().length ? 380 : 290,
   );
   const w = $derived(open ? OPEN.w : line ? LINE.w : pillW);
-  const h = $derived(open ? OPEN.h : line ? LINE.h : PILL_H);
+  const h = $derived(open ? OPEN.h : line ? LINE.h : alert ? ALERT_H : PILL_H);
   // Slide up leaving 2 px visible.
   const lift = $derived(tucked ? -(h + TOP - 2) : 0);
 
@@ -132,12 +142,13 @@
   const tint = $derived.by(() => {
     const key = open
       ? tab
-      : ({ 'claude-wait': 'wait', 'claude-work': 'claude', 'claude-done': 'claude', focus: 'focus', music: 'music' }[acts[0]] ?? 'idle');
+      : ({ 'claude-wait': 'wait', 'claude-work': 'claude', 'claude-done': 'claude', focus: 'focus', music: 'music', 'cal-alert': 'cal', 'cal-next': 'cal', 'cal-now': 'cal' }[acts[0]] ?? 'idle');
     if (key === 'wait') return ORANGE;
     if (key === 'claude') return cStatus === 'waiting' || waitingAgent() ? ORANGE : CLAY;
     if (key === 'focus') return VIOLET;
     if (key === 'notes') return [234, 179, 8];
     if (key === 'sys') return [16, 185, 129];
+    if (key === 'cal') return [96, 140, 255];
     if ((key === 'music' || key === 'home') && media.track.active && media.art.color) return media.art.color;
     return NEUTRAL;
   });
@@ -163,6 +174,11 @@
     hovering = state === 'active';
     if (state === 'active') {
       clearTimeout(peekT);
+      // Meeting card showing: open where "Unirse" can be clicked; it has been seen.
+      if (alert && cal) {
+        tab = 'cal';
+        calCmd.dismiss(cal.ev.id);
+      }
       open = true;
     } else if (state === 'away' && open && !editing) {
       leaveT = setTimeout(collapse, 450);
@@ -257,6 +273,7 @@
   class="island"
   class:open
   class:line
+  class:alert
   class:ghost={settings.ghost && ghost && !open}
   style="width:{w}px;height:{h}px;top:{TOP}px;left:{x}px;transform:translateY({lift}px);--alpha:{1 - settings.transparency / 100};--tr:{tint[0]};--tg:{tint[1]};--tb:{tint[2]};--glow:{glow}"
 >
@@ -291,6 +308,8 @@
           <System />
         {:else if tab === 'settings'}
           <Settings />
+        {:else if tab === 'cal'}
+          <Calendar go={(t) => (tab = t)} />
         {:else}
           <Focus />
         {/if}
@@ -346,6 +365,7 @@
   }
   .island.line { --r: 5px; --ear: 4px; }
   .island.open { --r: 30px; --ear: 14px; }
+  .island.alert { --r: 28px; --ear: 12px; }
   /* Passing over it: nearly invisible so what's underneath stays readable. */
   .island.ghost { opacity: 0.15; }
 

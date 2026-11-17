@@ -22,6 +22,10 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 sysinfo = { version = "0.40", default-features = false, features = ["system", "disk"] }
 # HTTP for optional HD covers (and Linux players that give an https cover URL).
 ureq = "3"
+# Calendar: iCal recurrence rules and time zones.
+rrule = "0.14"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [
@@ -40,6 +44,7 @@ windows = { version = "0.62", features = [
   "Win32_System_Registry",
   "Win32_System_ProcessStatus",
   "Win32_System_Threading",
+  "Win32_UI_Shell",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]

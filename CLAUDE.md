@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A macOS-style "Dynamic Island" for Windows and Linux (Fedora/Debian), built with **Tauri 2 + Rust + Svelte 5**. Panels: Claude Code activity, music, focus timer, quick notes, system stats, settings. All user-facing text (UI, CLI errors, tray menu, README, installer) is in **Spanish**; code comments and commit messages are in English (`feat: …`, `release: vX.Y.Z`).
+A macOS-style "Dynamic Island" for Windows and Linux (Fedora/Debian), built with **Tauri 2 + Rust + Svelte 5**. Panels: Claude Code activity, music, focus timer, quick notes, system stats, calendar, settings. All user-facing text (UI, CLI errors, tray menu, README, installer) is in **Spanish**; code comments and commit messages are in English (`feat: …`, `release: vX.Y.Z`).
 
 ## Commands
 
@@ -28,7 +28,7 @@ Pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds on Win
 
 ## Architecture
 
-**Core pushes, UI listens.** Rust owns all state (`*State` structs registered with `.manage()` in `main.rs`) and emits Tauri events (`settings`, `claude`, `media`, `media-art`, `focus`, `hover`, `covered`, `peek`, `open-tab`). `src/lib/store.svelte.js` holds Svelte 5 `$state` mirrors, loads snapshots via `invoke` once in `init()`, then only updates from events — the UI never polls the core. The clock ticks once a minute unless something on screen shows seconds (`setClockSeconds`). This design is deliberate for low CPU/RAM; keep new features event-driven and avoid emitting when nothing changed (see `Track::same_as` in `media/mod.rs`).
+**Core pushes, UI listens.** Rust owns all state (`*State` structs registered with `.manage()` in `main.rs`) and emits Tauri events (`settings`, `claude`, `media`, `media-art`, `focus`, `calendar`, `hover`, `covered`, `peek`, `open-tab`). `src/lib/store.svelte.js` holds Svelte 5 `$state` mirrors, loads snapshots via `invoke` once in `init()`, then only updates from events — the UI never polls the core. The clock ticks once a minute unless something on screen shows seconds (`setClockSeconds`). This design is deliberate for low CPU/RAM; keep new features event-driven and avoid emitting when nothing changed (see `Track::same_as` in `media/mod.rs`).
 
 Adding a command means: `#[tauri::command]` fn in its module → register in `generate_handler!` in `main.rs` → call via `invoke` from the store/component. `settings.rs` is the source of truth for settings; the defaults object in `store.svelte.js` mirrors it and must be kept in sync.
 
@@ -45,3 +45,5 @@ Adding a command means: `#[tauri::command]` fn in its module → register in `ge
 **Platform split**: `#[cfg(windows)]` / `#[cfg(target_os = "linux")]` modules — e.g. `media/windows.rs` (SMTC) vs `media/linux.rs` (MPRIS via zbus), Win32 APIs in `hit.rs`/`ipc.rs`/`settings.rs` (registry autostart) vs X11 (`x11rb`) / `~/.config/autostart`. Changes to shared Rust code must compile on both; Windows is the primary tested platform, Linux is mostly compile-verified (see README "Estado").
 
 **Memory budget**: WebView2 flags in `tauri.conf.json` (`--disable-gpu`, single renderer, V8 lite mode, etc.) are intentional RAM optimizations; the release profile is size-optimized with `panic = "abort"`. Don't remove them casually.
+
+**Calendar** (`calendar.rs`): read-only iCal feeds (Google's "secret address in iCal format", Outlook, iCloud) stored in `settings.calendars` — no OAuth. A worker downloads them every 5 min (or at once when the list changes, via `refresh_now`), keeps the last good copy per feed, expands RRULE/EXDATE/RECURRENCE-ID with the `rrule` crate from yesterday to tomorrow and emits `calendar` only when the result changed. No network while no calendar is configured. Meeting links (Meet/Zoom/Teams/Webex) are pulled from the event fields; `open_url` opens https links only. The UI side (`calPill()` in the store) decides the pill: `cal-next` within `cal_notify_mins`, `cal-alert` (pill grows to a 460×84 card) from 1 min before to 2 min after start, `cal-now` while in progress. The pill takes no clicks, so hovering the alert opens the Calendar tab, where "Unirse" lives.

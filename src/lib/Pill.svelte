@@ -1,5 +1,5 @@
 <script>
-  import { media, claude, claudeElapsed, focusRemaining, fmt, activeAgents, waitingAgent } from './store.svelte.js';
+  import { media, claude, claudeElapsed, focusRemaining, fmt, activeAgents, waitingAgent, calPill, calUntil, clock } from './store.svelte.js';
   import { icon } from './icons.js';
   import Cover from './Cover.svelte';
 
@@ -14,6 +14,9 @@
       ? (waitAgent.message?.match(/permission to use (\w+)/i)?.[1] ?? 'PERMISO').toUpperCase()
       : (claude.session?.message?.match(/permission to use (\w+)/i)?.[1] ?? claude.session?.tool ?? '').toUpperCase(),
   );
+
+  const cal = $derived(calPill());
+  const mins = (ms) => Math.max(1, Math.ceil(ms / 60_000));
 </script>
 
 {#snippet eq()}
@@ -31,11 +34,25 @@
     <span class="row"><span class="pulse"></span><span class="tag orange">PERMISO</span></span>
   {:else if kind === 'claude-done'}
     <span class="row clay">{@html icon('check', 15, 2.2)}<span class="tag">LISTO</span></span>
+  {:else if kind === 'cal-next' && cal}
+    <span class="row violet">{@html icon('cal', 15, 2)}<span class="num fg">{mins(cal.ev.start - clock.now)}m</span></span>
+  {:else if kind === 'cal-now' && cal}
+    <span class="row"><span class="cdot" style="background:{cal.ev.color}"></span><span class="num fg">{mins(cal.ev.end - clock.now)}m</span></span>
   {/if}
 {/snippet}
 
-<div class="pill">
-  {#if acts.length === 2}
+<div class="pill" class:alert={acts[0] === 'cal-alert'}>
+  {#if acts[0] === 'cal-alert' && cal}
+    <div class="acard">
+      <span class="label violet">{cal.ev.start > clock.now ? `EMPIEZA ${calUntil(cal.ev.start - clock.now).toUpperCase()}` : 'YA EMPEZÓ'}</span>
+      <span class="atitle">{cal.ev.title}</span>
+      <span class="ameta num">{fmt.hm24(new Date(cal.ev.start))} – {fmt.hm24(new Date(cal.ev.end))}</span>
+    </div>
+    <!-- The pill doesn't take clicks: hovering opens the Calendar tab, whose card has the real button. -->
+    {#if cal.ev.link}
+      <span class="join">{@html icon('video', 15, 2)}Unirse</span>
+    {/if}
+  {:else if acts.length === 2}
     {@render compact(acts[1])}
     {@render compact(acts[0])}
   {:else if acts[0] === 'music'}
@@ -60,6 +77,21 @@
   {:else if acts[0] === 'claude-wait'}
     <span class="row pad"><span class="pulse"></span><span class="msg">{#if waitAgent}{#if waitAgent.kind}Agente <span class="clay">{waitAgent.kind}</span> pide permiso{:else}Un agente pide permiso{/if}{:else}Claude pide permiso{/if}</span></span>
     <span class="tag orange">{waitTool}</span>
+  {:else if (acts[0] === 'cal-next' || acts[0] === 'cal-now') && cal}
+    <span class="row pad" title={cal.ev.title}>
+      {#if acts[0] === 'cal-next'}
+        <span class="violet ico">{@html icon('cal', 15, 2)}</span>
+      {:else}
+        <span class="cdot" style="background:{cal.ev.color}"></span>
+      {/if}
+      <span class="song">{cal.ev.title}</span>
+    </span>
+    {#if acts[0] === 'cal-next'}
+      <span class="num big violet nowrap">en {mins(cal.ev.start - clock.now)} min</span>
+    {:else}
+      <span class="num big dim nowrap">quedan {mins(cal.ev.end - clock.now)} min</span>
+      <i class="cbar" style="width:{Math.min(100, ((clock.now - cal.ev.start) / (cal.ev.end - cal.ev.start)) * 100)}%"></i>
+    {/if}
   {:else if acts[0] === 'claude-done'}
     {#if nAgents}
       <span class="row clay pad">{@html icon('check', 16, 2.2)}<span class="tag">LISTO</span></span>
@@ -80,6 +112,28 @@
     gap: 10px;
     padding: 0 14px 0 8px;
   }
+  .pill.alert { padding: 10px 14px 12px 24px; gap: 12px; }
+  .acard { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .atitle { font-family: var(--sans); font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ameta { font-size: 11px; color: var(--dim); }
+  .join {
+    flex: none;
+    height: 36px;
+    padding: 0 16px;
+    border-radius: 18px;
+    background: var(--fg);
+    color: #111;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cdot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .ico { display: grid; flex: none; }
+  .dim { color: var(--dim); }
+  .nowrap { white-space: nowrap; flex: none; }
+  .cbar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--violet); }
   .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .pad { padding-left: 6px; }
   .violet { color: var(--violet); }
