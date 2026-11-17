@@ -187,5 +187,5 @@
   .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; }
   .empty .title { font-family: var(--sans); font-size: 18px; font-weight: 600; }
   .empty .sub { max-width: 420px; font-family: var(--sans); font-size: 13px; line-height: 1.45; color: var(--dim); }
-  .connect-box { margin-top: 6px; width: 460px; text-align: left; }
+  .connect-box { margin-top: 6px; width: 460px; }
 </style>

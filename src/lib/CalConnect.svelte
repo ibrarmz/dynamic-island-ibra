@@ -157,5 +157,7 @@
   .steps { margin: 0; font-size: 11.5px; line-height: 1.45; }
   .dim { color: var(--dim); }
   .err { margin: 0; color: #ff9c94; font-size: 11.5px; }
-  .compact .steps { max-width: 440px; }
+  /* Empty Calendar tab: everything centred under the title. */
+  .compact .providers { justify-content: center; }
+  .compact .steps { text-align: center; }
 </style>
