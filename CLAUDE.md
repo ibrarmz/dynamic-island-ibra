@@ -22,7 +22,7 @@ npm run release -- 0.1.4 # bump version in package.json, package-lock, tauri.con
 
 Rust unit tests exist: `cd src-tauri && cargo test -p dynamic-island` (one module, e.g. `cargo test -p dynamic-island claude::tests`). There is no JS test suite or linter. Verification is otherwise manual or via the Linux Docker scripts in `ci/` (each Dockerfile's header has the exact `docker build`/`docker run` lines): `linux.Dockerfile` is the base build image, `linux-bundle.*` produces `.deb`/`.rpm` into `dist-linux/` (needs `dist/` built on the host first), `linux-smoke.*` runs the app on Xvfb, feeds it Claude hook events through `island-hook`, screenshots it, and checks that a second instance exits.
 
-`ISLAND_PEEK=home,claude,music,focus,notes,sys` opens each panel in turn at startup (for screenshots).
+`ISLAND_PEEK=home,claude,music,focus,notes,sys` opens each panel in turn at startup (for screenshots). `ISLAND_DEMO=1` starts with no real data and ignores the cursor (no Claude channel, player, calendars, update checks, hook repair or hover tracking) so a demo can be driven by emitting events; `scripts/record-demo.mjs` uses it to record `docs/demo.gif`.
 
 Pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds on Windows + Linux and uploads NSIS, MSI, portable .zip (with `.github/portable-LEEME.txt`), .deb and .rpm to the GitHub release.
 

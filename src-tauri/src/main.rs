@@ -62,12 +62,17 @@ fn main() {
     #[cfg(target_os = "linux")]
     webkit::tune_env();
 
+    // Dev aid: ISLAND_DEMO=1 starts with no real data (no Claude channel, player,
+    // calendars, update checks or hook repair) so a demo can be fed through events.
+    let demo = std::env::var_os("ISLAND_DEMO").is_some();
+
     // Claim the local channel; if another island owns it, this one isn't needed.
-    let claimed = claude::ipc::serve(|bytes| {
-        if let (Some(app), Ok(ev)) = (APP.get(), serde_json::from_slice(&bytes)) {
-            claude::handle(app, ev);
-        }
-    });
+    let claimed = demo
+        || claude::ipc::serve(|bytes| {
+            if let (Some(app), Ok(ev)) = (APP.get(), serde_json::from_slice(&bytes)) {
+                claude::handle(app, ev);
+            }
+        });
     if !claimed {
         return;
     }
@@ -121,22 +126,29 @@ fn main() {
             update::update_check,
             update::update_install,
         ])
-        .setup(|app| {
+        .setup(move |app| {
             let _ = APP.set(app.handle().clone());
             settings::load(app.handle());
             let s = settings::get(app.handle());
             focus::apply_defaults(app.handle(), s.focus_mins, s.break_mins);
-            claude::hooks::repair();
+            if !demo {
+                claude::hooks::repair();
+            }
 
             let win = app.get_webview_window("island").expect("island window missing");
             #[cfg(target_os = "linux")]
             webkit::tune(&win);
             hit::place_window(&win);
             win.show()?;
-            hit::start(win.clone());
-            media::start(app.handle().clone());
-            calendar::start(app.handle().clone());
-            update::start(app.handle().clone());
+            // Demo: the real cursor must not open or fade the island mid-recording.
+            if !demo {
+                hit::start(win.clone());
+            }
+            if !demo {
+                media::start(app.handle().clone());
+                calendar::start(app.handle().clone());
+                update::start(app.handle().clone());
+            }
 
             // Dev aid: ISLAND_PEEK=home,music,focus opens each panel in turn (for screenshots).
             if let Ok(tabs) = std::env::var("ISLAND_PEEK") {

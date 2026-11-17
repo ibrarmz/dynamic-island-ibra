@@ -1,6 +1,22 @@
 # Dynamic Island para escritorio
 
-Una isla dinámica estilo macOS para Windows, Fedora y Debian, hecha con **Tauri 2 + Rust + Svelte 5**.
+Una isla dinámica para **Windows y Linux** que vive arriba de tu pantalla: lo que suena, lo que hace Claude Code, tu próxima reunión y tus herramientas del día, a un vistazo. Gratis y de código abierto.
+
+<p align="center"><img src="docs/demo.gif" alt="La isla: música en la píldora, Claude Code trabajando y pidiendo permiso, aviso de reunión y los paneles de música, Claude y calendario" width="760"></p>
+
+**[Descargar la última versión](https://github.com/ibrarmz/dynamic-island-ibra/releases/latest)** · Windows 10/11, Debian/Ubuntu, Fedora
+
+## Qué hace
+
+- **Música** de cualquier reproductor (Spotify, YouTube en el navegador, Apple Music, VLC…): carátula, controles y barra de progreso. Opcional: carátulas en HD.
+- **Claude Code** en vivo: qué fase lleva (leer, editar, probar), el diff que está escribiendo, sus subagentes, y se asoma cuando **pide permiso** o termina.
+- **Calendario** de Google, Outlook o iCloud (link iCal, sin iniciar sesión): tu agenda del día, «Daily en 12 min» en la píldora, aviso un minuto antes y botón **Unirse** a Meet, Zoom o Teams.
+- **Focus** (pomodoro), **notas rápidas** y **sistema** (CPU, memoria, disco, batería).
+- **No estorba:** sin actividad es una línea de 64 px; si el cursor solo pasa, se vuelve transparente y los clics atraviesan; se esconde con ventanas maximizadas.
+- **Ligera y privada:** ~150 MB de RAM, casi 0 % de CPU en reposo, sin cuentas ni servidores propios ([qué se conecta a internet](#privacidad-qué-se-conecta-a-internet)).
+- **Se actualiza sola** con firma verificada.
+
+Hecha con **Tauri 2 + Rust + Svelte 5**.
 
 ## Instalar
 
@@ -52,6 +68,8 @@ npm run release -- 0.1.2
 ```
 
 Pone la versión en `package.json`, `tauri.conf.json` y `Cargo.toml`, hace commit, crea el tag `v0.1.2` y lo sube. GitHub Actions (`.github/workflows/release.yml`) compila el instalador de Windows y los paquetes `.deb`/`.rpm` y los publica en el release, en unos 15–20 minutos.
+
+Para regrabar el GIF de arriba con datos de ejemplo (sin tu música, calendario ni sesiones): `scripts/record-demo.mjs`; las instrucciones están al inicio del archivo.
 
 ## Ajustes
 
@@ -111,6 +129,8 @@ Los hooks de Claude Code usan un canal local (named pipe / socket Unix), nunca l
 | Notas: nota rápida con guardado automático, botón **+** del dock | Probado (render) | Compila |
 | Sistema: CPU con historial, memoria, disco, batería, tiempo encendido, RAM de la isla | Probado | Compila |
 | Ajustes, posición, autoarranque | Probado en la app instalada | Compila |
+| Calendario iCal: agenda, avisos, Unirse, conectar copiando el link | Probado con Google (calendario real) | Compila |
+| Actualización automática | Probada de 0.1.13 a 0.1.14 con el instalador `.exe` | Avisa y abre la descarga |
 | Instalador / desinstalador | NSIS por usuario, probado instalar → usar → desinstalar | `.deb` / `.rpm` generados en Docker, sin instalar en un escritorio real |
 
 Las notas se guardan en `notes.md` dentro de la carpeta de datos de la app (`%APPDATA%\dev.dynamicisland.island` en Windows, `~/.local/share/dev.dynamicisland.island` en Linux). Mientras escribes, la isla no se cierra al sacar el cursor; se cierra al hacer clic en otra app, y en Windows le devuelve el teclado a la app donde estabas.
