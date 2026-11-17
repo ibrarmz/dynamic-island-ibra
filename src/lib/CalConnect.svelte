@@ -14,7 +14,7 @@
     google: {
       label: 'Google Calendar',
       url: 'https://calendar.google.com/calendar/r/settings',
-      steps: 'Elige tu calendario en la izquierda, baja a «Dirección secreta en formato iCal» y cópiala.',
+      steps: 'Elige tu calendario en la izquierda y baja a «Integrar el calendario». Copia la «Dirección secreta en formato iCal» (no la pública).',
     },
     outlook: {
       label: 'Outlook',
@@ -30,6 +30,8 @@
   let busy = $state(false);
   let error = $state('');
 
+  // Google's public address only works for public calendars: usually the wrong one.
+  const googlePublic = $derived(!!found && found.includes('calendar.google.com/calendar/ical/') && found.includes('/public/'));
   const kind = (u) => (u.includes('google.com') ? 'Google Calendar' : u.includes('outlook') || u.includes('office') ? 'Outlook' : u.includes('icloud') ? 'iCloud' : 'calendario');
 
   onMount(() => {
@@ -71,11 +73,14 @@
 
 <div class="connect" class:compact>
   {#if found}
-    <div class="found">
-      <span class="ok">{@html icon('check', 15, 2.2)}</span>
-      <span class="ftext">Copiaste un link de <b>{kind(found)}</b></span>
+    <div class="found" class:warn={googlePublic}>
+      <span class="ok">{@html icon(googlePublic ? 'link' : 'check', 15, 2.2)}</span>
+      <span class="ftext">{#if googlePublic}Copiaste la dirección <b>pública</b>{:else}Copiaste un link de <b>{kind(found)}</b>{/if}</span>
       <button class="primary" disabled={busy} onclick={() => connect(found)}>{busy ? 'Conectando…' : 'Conectar'}</button>
     </div>
+    {#if googlePublic && !error}
+      <p class="steps warn-text">Solo funciona si tu calendario es público. Si no, copia la «Dirección secreta en formato iCal», más abajo en la misma página.</p>
+    {/if}
   {/if}
 
   <div class="providers">
@@ -111,6 +116,9 @@
     box-shadow: inset 0 0 0 1px rgba(110, 231, 183, 0.3);
   }
   .ok { color: #6ee7b7; display: grid; }
+  .found.warn { background: rgba(255, 181, 133, 0.12); box-shadow: inset 0 0 0 1px rgba(255, 181, 133, 0.35); }
+  .found.warn .ok { color: #ffb585; }
+  .warn-text { color: #ffcfa8; }
   .ftext { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .providers { display: flex; flex-wrap: wrap; gap: 6px; }
   .prov {

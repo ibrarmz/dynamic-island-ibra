@@ -165,6 +165,11 @@ fn fetch(url: &str) -> Result<String, String> {
     let mut res = agent.get(&url).call().map_err(|_| "Sin conexión o el servidor no responde".to_string())?;
     match res.status().as_u16() {
         200..=299 => {}
+        // Google's "public address" only works for public calendars; the one
+        // people mean to copy is the secret address further down the page.
+        401 | 403 | 404 if is_google_public(&url) => {
+            return Err("Ese es el link público y tu calendario no es público. Copia la «Dirección secreta en formato iCal» (más abajo, en la misma página)".into())
+        }
         401 | 403 | 404 | 410 => return Err("El link ya no es válido (¿lo restableciste?)".into()),
         code => return Err(format!("El servidor respondió {code}")),
     }
@@ -179,6 +184,10 @@ fn fetch(url: &str) -> Result<String, String> {
         return Err("Ese link no es un calendario iCal".into());
     }
     Ok(text)
+}
+
+fn is_google_public(url: &str) -> bool {
+    url.contains("calendar.google.com/calendar/ical/") && url.contains("/public/")
 }
 
 /// `webcal://` is what calendar apps hand out; it is plain https.
@@ -745,6 +754,14 @@ END:VCALENDAR\r
         assert_eq!(normalize_url(" webcal://p01-caldav.icloud.com/x.ics ").unwrap(), "https://p01-caldav.icloud.com/x.ics");
         assert!(normalize_url("http://x.com/a.ics").is_err());
         assert!(normalize_url("javascript:alert(1)").is_err());
+    }
+
+    /// Hits the network: cargo test -p dynamic-island live_google -- --ignored
+    #[test]
+    #[ignore]
+    fn live_google_public_of_a_private_calendar() {
+        let err = fetch("https://calendar.google.com/calendar/ical/zzq-no-existe-123%40gmail.com/public/basic.ics").unwrap_err();
+        assert!(err.contains("Dirección secreta"), "{err}");
     }
 
     #[test]
