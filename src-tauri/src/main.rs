@@ -11,6 +11,7 @@ mod media;
 mod notes;
 mod settings;
 mod sys;
+mod update;
 #[cfg(target_os = "linux")]
 mod webkit;
 
@@ -71,7 +72,11 @@ fn main() {
         return;
     }
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // In-app updates install by themselves only on Windows (installer / MSI).
+    #[cfg(windows)]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -84,6 +89,7 @@ fn main() {
         .manage(claude::ClaudeState::default())
         .manage(sys::SysState::default())
         .manage(calendar::CalState::default())
+        .manage(update::UpdateState::default())
         .invoke_handler(tauri::generate_handler![
             settings::settings_get,
             settings::settings_set,
@@ -111,6 +117,9 @@ fn main() {
             calendar::cal_refresh,
             calendar::cal_clipboard,
             calendar::open_url,
+            update::update_status,
+            update::update_check,
+            update::update_install,
         ])
         .setup(|app| {
             let _ = APP.set(app.handle().clone());
@@ -127,6 +136,7 @@ fn main() {
             hit::start(win.clone());
             media::start(app.handle().clone());
             calendar::start(app.handle().clone());
+            update::start(app.handle().clone());
 
             // Dev aid: ISLAND_PEEK=home,music,focus opens each panel in turn (for screenshots).
             if let Ok(tabs) = std::env::var("ISLAND_PEEK") {

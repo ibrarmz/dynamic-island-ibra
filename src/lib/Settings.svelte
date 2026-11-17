@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { settings, setSettings, claude, claudeCmd, calendar, calCmd, clock } from './store.svelte.js';
+  import { settings, setSettings, claude, claudeCmd, calendar, calCmd, clock, update, updateCmd } from './store.svelte.js';
   import { icon } from './icons.js';
   import CalConnect from './CalConnect.svelte';
 
@@ -111,6 +111,26 @@
           />
           <span class="num">{settings.transparency}%</span>
         </span>
+      </div>
+    </section>
+
+    <section>
+      <h3 class="label">ACTUALIZACIONES</h3>
+      <div class="row">
+        {#if update.latest}
+          <span class="new">Nueva versión {update.latest}</span>
+          <button class="btn primary" disabled={update.installing || busy === 'update'} onclick={() => run('update', updateCmd.install)}>
+            {update.installing ? 'Instalando…' : update.can_install ? 'Actualizar' : 'Descargar'}
+          </button>
+        {:else}
+          <span>Versión {update.current}{update.checked_at ? ' · al día' : ''}</span>
+          <button class="btn" disabled={busy === 'update'} onclick={() => run('update', updateCmd.check)}>{busy === 'update' ? 'Buscando…' : 'Buscar'}</button>
+        {/if}
+      </div>
+      {#if update.error}<p class="err">{update.error}</p>{/if}
+      <div class="row">
+        <span>Buscar automáticamente</span>
+        {@render toggle(settings.check_updates, 'Buscar actualizaciones automáticamente', () => set({ check_updates: !settings.check_updates }))}
       </div>
     </section>
 
@@ -287,6 +307,9 @@
   .btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
   button:disabled { opacity: 0.45; cursor: default; }
   .err { color: #ff9c94; font-size: 12px; }
+  .new { color: #6ee7b7; }
+  .btn.primary { background: var(--fg); color: #141010; font-weight: 600; }
+  .btn.primary:hover:not(:disabled) { background: #fff; }
   .cal-row { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 4px 0 10px; margin-bottom: 4px; border-radius: 9px; background: rgba(255, 255, 255, 0.06); font-size: 12.5px; }
   .cdot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
   .cname { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

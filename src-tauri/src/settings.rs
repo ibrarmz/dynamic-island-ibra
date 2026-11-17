@@ -40,6 +40,8 @@ pub struct Settings {
     pub cal_hide_allday: bool,
     /// Only events with a meeting link reach the pill.
     pub cal_only_links: bool,
+    /// Look for a newer version on GitHub at startup and every 12 h.
+    pub check_updates: bool,
     /// Which sections this file already knows about. A section added in a later
     /// version is switched on once (files without the field are 0).
     #[serde(default)]
@@ -68,6 +70,7 @@ impl Default for Settings {
             cal_peek: true,
             cal_hide_allday: false,
             cal_only_links: false,
+            check_updates: true,
             tabs_v: TABS_V,
         }
     }

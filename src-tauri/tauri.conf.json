@@ -61,5 +61,12 @@
         "componentGroupRefs": ["IslandUninstallCleanup"]
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJDRjVDMDQ0NjE0Mjk3OTEKUldTUmwwSmhSTUQxTENsdVZpZHBTZGhNMmhPei9RYUxzaHI3NFBpSnNFamxyYlJtVWU4MzdrMk4K",
+      "endpoints": ["https://github.com/ibrarmz/dynamic-island-ibra/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
   }
 }

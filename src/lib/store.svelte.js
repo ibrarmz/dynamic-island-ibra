@@ -52,6 +52,7 @@ export const settings = $state({
   cal_peek: true,
   cal_hide_allday: false,
   cal_only_links: false,
+  check_updates: true,
   tabs_v: 1,
 });
 
@@ -72,6 +73,8 @@ export async function init() {
   await listen('media', (e) => (media.track = e.payload));
   await listen('media-art', (e) => (media.art = e.payload));
   await listen('focus', (e) => Object.assign(focus, e.payload));
+  Object.assign(update, await invoke('update_status'));
+  await listen('update', (e) => Object.assign(update, e.payload));
   Object.assign(calendar, await invoke('cal_snapshot'));
   await listen('calendar', (e) => Object.assign(calendar, e.payload));
 
@@ -108,6 +111,13 @@ export const focusCmd = {
   reset: () => invoke('focus_reset'),
   mode: (mode) => invoke('focus_mode', { mode }),
   minutes: (minutes) => invoke('focus_minutes', { minutes }),
+};
+
+// Updates: `latest` is set when GitHub has a newer version.
+export const update = $state({ current: '', latest: null, can_install: false, installing: false, error: null, checked_at: 0 });
+export const updateCmd = {
+  check: () => invoke('update_check').then((s) => Object.assign(update, s)),
+  install: () => invoke('update_install'),
 };
 
 // Calendar: occurrences from yesterday to tomorrow (epoch ms), plus each feed's status.

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { init, media, focus, claude, clock, fmt, setClockSeconds, settings, activeAgents, waitingAgent, calPill, calCmd } from './lib/store.svelte.js';
+  import { init, media, focus, claude, clock, fmt, setClockSeconds, settings, activeAgents, waitingAgent, calPill, calCmd, update } from './lib/store.svelte.js';
   import { icon } from './lib/icons.js';
   import Pill from './lib/Pill.svelte';
   import Home from './lib/Home.svelte';
@@ -328,6 +328,7 @@
               onclick={() => (tab = t.id)}
             >
               {@html icon(t.icon)}<span>{t.label}</span>
+              {#if t.id === 'settings' && update.latest}<i class="badge-dot" aria-label="Actualización disponible"></i>{/if}
             </button>
           {/each}
         </div>
@@ -489,6 +490,8 @@
   .tab:hover { color: var(--fg); }
   .tab.on { background: rgba(255, 255, 255, 0.13); color: var(--fg); }
   .tab.on span { max-width: 90px; opacity: 1; }
+  .tab { position: relative; }
+  .badge-dot { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: #6ee7b7; }
 
   .icon-btn {
     width: 32px;

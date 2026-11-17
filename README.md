@@ -14,6 +14,8 @@ Descarga el instalador de la [última versión](https://github.com/ibrarmz/dynam
 | Debian / Ubuntu | `dynamic-island_<versión>_amd64.deb` | `sudo apt install ./dynamic-island_<versión>_amd64.deb` |
 | Fedora | `dynamic-island-<versión>-1.x86_64.rpm` | `sudo dnf install ./dynamic-island-<versión>-1.x86_64.rpm` |
 
+**Actualizaciones:** la isla revisa GitHub al arrancar y cada 12 horas. Con el instalador `.exe` o el `.msi` se actualiza sola desde **Ajustes → Actualizaciones** (verifica la firma de la descarga antes de instalar); con el `.zip` portable y en Linux te avisa y abre la página de descarga. Se puede apagar en Ajustes.
+
 Usa solo una de las opciones de Windows. Los dos, al desinstalar, quitan los hooks de Claude y el inicio automático (`dynamic-island uninstall-cleanup`). No están firmados: si SmartScreen avisa, "Más información" → "Ejecutar de todas formas".
 
 En Linux, antes de desinstalar, corre `dynamic-island hooks uninstall` si conectaste Claude Code y apaga "Iniciar con el sistema" en Ajustes: el paquete se desinstala como root y no puede tocar la configuración de tu usuario.
@@ -62,6 +64,16 @@ Pone la versión en `package.json`, `tauri.conf.json` y `Cargo.toml`, hace commi
 - **Focus:** minutos de focus y de descanso (la regla del panel Focus también los guarda)
 - **Secciones del dock** visibles
 - **Claude Code:** conectar / desconectar, y si la isla se abre cuando pide permiso
+- **Música:** carátulas en HD desde el catálogo de iTunes (apagado por defecto)
+- **Calendario:** conectar calendarios por link iCal y cuándo avisar
+- **Actualizaciones:** versión, buscar e instalar, y buscar automáticamente
+
+### Conectar un calendario
+
+Sección **Calendario** (o Ajustes → Calendario) → **Google Calendar** u **Outlook** abre la página donde está el link iCal. Cópialo, vuelve a la isla y aparece **Conectar**; para iCloud u otros, **Pegar link**. Es de solo lectura y sin iniciar sesión: el link se guarda solo en tu PC y se descarga cada 5 minutos.
+
+- **Google:** «Dirección secreta en formato iCal», no la pública (esa solo funciona si el calendario es público). En cuentas de trabajo el administrador puede ocultar la secreta; si solo puedes publicar la disponibilidad, la isla muestra los eventos como «Ocupado».
+- **Outlook:** «Publicar un calendario» → link ICS.
 
 ### Conectar Claude Code
 
@@ -74,6 +86,18 @@ Los hooks llaman a `island-hook`, un ejecutable de 200 KB que solo reenvía el e
 - **Sin actividad** es solo una línea de 64×5 px. Con música, focus o Claude trabajando muestra la píldora.
 - **Modo fantasma** (Windows): si el cursor solo pasa por encima, la isla se desvanece al 15 % y los clics van a lo que hay debajo. Se abre si dejas el cursor quieto 0.4 s (0.6 s si hay algo activo) o si mantienes `Ctrl`. En Linux se abre igual con la espera o `Ctrl`, pero la isla misma no deja pasar clics.
 - **Ventana maximizada o pantalla completa** en ese monitor: la isla sube y deja 2 px visibles. Se asoma sola cuando termina un focus o cuando Claude pide permiso.
+
+## Privacidad: qué se conecta a internet
+
+Nada sale de tu PC hacia un servidor del proyecto: no hay servidor. Las únicas conexiones son:
+
+| Qué | A dónde | Cuándo |
+| --- | --- | --- |
+| Buscar actualizaciones | `github.com` (el `latest.json` del último release) | Al arrancar y cada 12 h; se apaga en Ajustes |
+| Calendarios | El link iCal que tú agregaste | Cada 5 min, solo si agregaste alguno |
+| Carátulas en HD | `itunes.apple.com` (artista y título de la canción) | Solo si lo activas en Ajustes |
+
+Los hooks de Claude Code usan un canal local (named pipe / socket Unix), nunca la red.
 
 ## Estado
 
@@ -133,3 +157,7 @@ ci/                        compilación y prueba de humo de Linux en Docker
 ```
 
 `ISLAND_PEEK=home,claude,music,focus,notes,sys` abre cada panel al iniciar (útil para capturas).
+
+## Licencia
+
+[MIT](LICENSE): úsalo, cópialo, modifícalo y compártelo libremente, también en proyectos comerciales, conservando el aviso de copyright.

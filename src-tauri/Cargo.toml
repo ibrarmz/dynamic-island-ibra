@@ -3,6 +3,8 @@ name = "dynamic-island"
 version = "0.1.12"
 description = "Dynamic Island for Windows and Linux"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/ibrarmz/dynamic-island-ibra"
 default-run = "dynamic-island"
 
 [workspace]
@@ -30,6 +32,7 @@ chrono-tz = "0.10"
 arboard = { version = "3", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
+tauri-plugin-updater = "2"
 windows = { version = "0.62", features = [
   "Foundation",
   "Media_Control",
