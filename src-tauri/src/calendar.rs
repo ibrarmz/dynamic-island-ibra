@@ -465,7 +465,13 @@ fn expand(events: &[VEvent], from: DateTime<Utc>, to: DateTime<Utc>) -> Vec<Even
             .unwrap_or(if all_day { CDur::days(1) } else { CDur::zero() })
             .max(CDur::zero());
         let link = find_link(&ev.link_fields);
-        let title = if ev.summary.trim().is_empty() { "(Sin título)".to_string() } else { ev.summary.trim().to_string() };
+        // Calendars shared as "free/busy only" (Google's public address on many
+        // work accounts) name every event "Busy".
+        let title = match ev.summary.trim() {
+            "" => "(Sin título)".to_string(),
+            "Busy" => "Ocupado".to_string(),
+            t => t.to_string(),
+        };
 
         let starts: Vec<DateTime<Tz>> = match (&ev.rrule, &ev.recurrence_id) {
             (Some(rule), None) => occurrences(rule, &ev.exdates, start, from - length, to)
@@ -754,6 +760,29 @@ END:VCALENDAR\r
         assert_eq!(normalize_url(" webcal://p01-caldav.icloud.com/x.ics ").unwrap(), "https://p01-caldav.icloud.com/x.ics");
         assert!(normalize_url("http://x.com/a.ics").is_err());
         assert!(normalize_url("javascript:alert(1)").is_err());
+    }
+
+    /// A real export, kept out of the repo: ICS_FILE=path cargo test -p dynamic-island real_export -- --ignored --nocapture
+    /// Prints only counts and times, never titles.
+    #[test]
+    #[ignore]
+    fn real_export() {
+        let text = std::fs::read_to_string(std::env::var("ICS_FILE").expect("ICS_FILE")).unwrap();
+        let parsed = parse(&text);
+        let today = Local::now().date_naive();
+        for day in 0..3 {
+            let d = today + CDur::days(day);
+            let ev = expand(&parsed.events, local_midnight(d), local_midnight(d + CDur::days(1)));
+            let times: Vec<String> = ev
+                .iter()
+                .filter(|e| !e.all_day)
+                .map(|e| {
+                    let s = Utc.timestamp_millis_opt(e.start).unwrap().with_timezone(&Local);
+                    format!("{}({}m{})", s.format("%H:%M"), (e.end - e.start) / 60_000, if e.link.is_some() { ",link" } else { "" })
+                })
+                .collect();
+            println!("{d}: {} eventos, {} todo el día: {}", ev.len(), ev.iter().filter(|e| e.all_day).count(), times.join(" "));
+        }
     }
 
     /// Hits the network: cargo test -p dynamic-island live_google -- --ignored
