@@ -5,7 +5,7 @@ Una isla dinámica para **Windows y Linux** que vive arriba de tu pantalla: lo q
 
 <p align="center"><img src="docs/demo.gif" alt="La isla: música en la píldora, Claude Code trabajando y pidiendo permiso, aviso de reunión y los paneles de música, Claude y calendario" width="760"></p>
 
-**[Descargar la última versión](https://github.com/ibrarmz/ibrae/releases/latest)** · Windows 10/11, Debian/Ubuntu, Fedora
+**[Descargar la última versión](https://github.com/ibrarmz/ibrae/releases/latest)** · Windows 10/11, Debian/Ubuntu, Fedora · [♥ Apoyar](https://github.com/sponsors/ibrarmz)
 
 ## Qué hace
 
@@ -189,6 +189,10 @@ ci/                        compilación y prueba de humo de Linux en Docker
 ```
 
 `ISLAND_PEEK=home,claude,music,focus,notes,sys` abre cada panel al iniciar (útil para capturas).
+
+## Apoyar
+
+IBRÆ es gratis, sin anuncios y sin cuentas. Si te sirve y quieres que siga creciendo, puedes apoyarlo en [GitHub Sponsors](https://github.com/sponsors/ibrarmz) (una vez o cada mes). También ayuda mucho darle ⭐ al repo y contarle a alguien. En la isla está en Ajustes → **♥ Apoyar**.
 
 ## Licencia
 

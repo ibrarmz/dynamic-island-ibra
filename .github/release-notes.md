@@ -17,3 +17,5 @@ Los instaladores se compilan automáticamente en GitHub y aparecen aquí unos mi
 - **¿Venías de "Dynamic Island"?** Es la misma app con nombre nuevo. En Windows, al abrir IBRÆ por primera vez se quita la versión anterior y se conservan tus notas, ajustes, calendarios, la conexión con Claude Code y el inicio automático. En Linux, quita el paquete viejo: `sudo apt remove dynamic-island` o `sudo dnf remove dynamic-island`.
 
 Para conectar Claude Code: en la isla, sección Claude → Conectar.
+
+♥ IBRÆ es gratis y de código abierto. Si te sirve, puedes apoyarlo en [GitHub Sponsors](https://github.com/sponsors/ibrarmz).

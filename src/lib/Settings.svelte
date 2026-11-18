@@ -5,6 +5,8 @@
   import { icon } from './icons.js';
   import CalConnect from './CalConnect.svelte';
 
+  const SPONSORS = 'https://github.com/sponsors/ibrarmz';
+
   const SECTIONS = [
     { id: 'claude', label: 'Claude' },
     { id: 'music', label: 'Música' },
@@ -293,9 +295,14 @@
     </section>
     {#if error}<p class="err">{error}</p>{/if}
     <footer class="brand" aria-label="Acerca de">
-      <span class="mark">IBRÆ</span>
-      <span>A different layer of your desktop.</span>
-      <span class="sig">DESIGNED BY IBRA · EST. 2026</span>
+      <span class="about">
+        <span class="mark">IBRÆ</span>
+        <span>A different layer of your desktop.</span>
+        <span class="sig">DESIGNED BY IBRA · EST. 2026</span>
+      </span>
+      <button class="sponsor" title="IBRÆ es gratis y de código abierto. Si te sirve, puedes apoyarlo en GitHub Sponsors." onclick={() => invoke('open_url', { url: SPONSORS }).catch(() => {})}>
+        <span class="heart">♥</span> Apoyar
+      </button>
     </footer>
   </div>
 </div>
@@ -412,7 +419,11 @@
   .bad { color: #ff9c94; }
   .x { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 8px; color: var(--dim); }
   .x:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); color: var(--fg); }
-  .brand { display: flex; flex-direction: column; gap: 2px; margin: 10px 0 6px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 11.5px; color: var(--dim); }
+  .brand { display: flex; align-items: center; gap: 12px; margin: 10px 0 6px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 11.5px; color: var(--dim); }
+  .about { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .sponsor { flex: none; height: 30px; padding: 0 13px; border-radius: 9px; font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--fg); background: rgba(219, 97, 162, 0.14); box-shadow: inset 0 0 0 1px rgba(219, 97, 162, 0.38); transition: background 0.15s; }
+  .sponsor:hover { background: rgba(219, 97, 162, 0.26); }
+  .heart { color: #f07ab8; }
   .brand .mark { font-family: var(--sans); font-size: 15px; font-weight: 700; letter-spacing: 0.18em; color: var(--fg); }
   .brand .sig { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em; color: var(--faint); }
   .hint { margin: 0 0 2px; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
