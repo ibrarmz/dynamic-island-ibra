@@ -10,7 +10,7 @@ Una isla dinámica para **Windows y Linux** que vive arriba de tu pantalla: lo q
 ## Qué hace
 
 - **Música** de cualquier reproductor (Spotify, YouTube en el navegador, Apple Music, VLC…): carátula, controles y barra de progreso. Opcional: carátulas en HD.
-- **Claude Code** en vivo: qué fase lleva (leer, editar, probar), el diff que está escribiendo, sus subagentes, y se asoma cuando **pide permiso** o termina.
+- **Claude Code** en vivo: qué fase lleva (leer, editar, probar), el diff que está escribiendo, sus subagentes, y se asoma cuando termina. Cuando **pide permiso**, contestas desde la isla: **Permitir**, **Siempre** o **Denegar**, sin volver a la terminal.
 - **Calendario** de Google, Outlook o iCloud (link iCal, sin iniciar sesión): tu agenda del día, «Daily en 12 min» en la píldora, aviso un minuto antes y botón **Unirse** a Meet, Zoom o Teams.
 - **Focus** (pomodoro), **notas rápidas** y **sistema** (CPU, memoria, disco, batería).
 - **Varios monitores:** en la pantalla que elijas, o siguiendo al cursor de un monitor a otro.
@@ -86,7 +86,7 @@ Para regrabar el GIF de arriba con datos de ejemplo (sin tu música, calendario 
 - **Modo fantasma** y **esconder con ventanas maximizadas**
 - **Focus:** minutos de focus y de descanso (la regla del panel Focus también los guarda)
 - **Secciones del dock** visibles
-- **Claude Code:** conectar / desconectar, y si la isla se abre cuando pide permiso
+- **Claude Code:** conectar / desconectar, si la isla se abre cuando pide permiso y si puedes contestar permisos desde la isla
 - **Música:** carátulas en HD desde el catálogo de iTunes (apagado por defecto)
 - **Calendario:** conectar calendarios por link iCal y cuándo avisar
 - **Actualizaciones:** versión, buscar e instalar, y buscar automáticamente
@@ -101,6 +101,13 @@ Sección **Calendario** (o Ajustes → Calendario) → **Google Calendar** u **O
 ### Conectar Claude Code
 
 En la isla, sección **Claude** → **Conectar**. Eso agrega hooks a `~/.claude/settings.json` (guarda antes un respaldo `settings.json.bak-dynamic-island`) y aplica a las sesiones nuevas de Claude Code. También desde terminal: `ibrae hooks install` / `hooks uninstall`.
+
+**Permisos desde la isla.** Cuando Claude pide permiso (un comando, editar un archivo, abrir una web…), la isla muestra qué quiere hacer y tres botones:
+- **Permitir:** solo esta vez.
+- **Siempre:** agrega la misma regla que el "no volver a preguntar" de la terminal (por ejemplo `Bash(npm test:*)`). Sale solo cuando Claude Code la ofrece.
+- **Denegar:** Claude no lo hace y sigue sin eso.
+
+La terminal te pregunta al mismo tiempo; vale la primera respuesta. Si contestas allá, la tarjeta desaparece sola. Las preguntas de opciones y la revisión del plan se contestan solo en la terminal. Si un subagente en segundo plano pide permiso, la isla espera 30 s y luego deja que pregunte la terminal. Se apaga en Ajustes → "Responder permisos desde la isla".
 
 Los hooks llaman a `island-hook`, un ejecutable de 200 KB que solo reenvía el evento por un canal local (named pipe en Windows, socket Unix en Linux; nada de puertos de red). Van con `"async": true`, así que Claude nunca espera a la isla.
 

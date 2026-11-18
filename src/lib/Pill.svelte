@@ -7,10 +7,16 @@
   let { acts } = $props();
 
   // The main session's own permission wins over a subagent's.
-  const waitAgent = $derived(claude.session?.status === 'waiting' ? null : waitingAgent());
+  // A prompt the island can answer says exactly who asks and for what.
+  const perm = $derived(claude.perms[0]);
+  const waitAgent = $derived(
+    perm ? (perm.agent ? { kind: perm.agent } : null) : claude.session?.status === 'waiting' ? null : waitingAgent(),
+  );
   const nAgents = $derived(activeAgents().length);
   const waitTool = $derived(
-    waitAgent
+    perm
+      ? perm.tool.toUpperCase()
+      : waitAgent
       ? (waitAgent.message?.match(/permission to use (\w+)/i)?.[1] ?? 'PERMISO').toUpperCase()
       : (claude.session?.message?.match(/permission to use (\w+)/i)?.[1] ?? claude.session?.tool ?? '').toUpperCase(),
   );

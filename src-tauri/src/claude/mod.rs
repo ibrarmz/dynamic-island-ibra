@@ -7,6 +7,7 @@
 pub mod hookclient;
 pub mod hooks;
 pub mod ipc;
+pub mod permission;
 
 use serde::Serialize;
 use serde_json::Value;
@@ -448,6 +449,17 @@ fn is_permission(ev: &Value, msg: &str) -> bool {
         Some(kind) => kind == "permission_prompt",
         None => !msg.to_lowercase().contains("waiting for your input"),
     }
+}
+
+/// A message from a hook client. Permission requests keep their connection to
+/// answer later; anything else closes it right away.
+pub fn receive(app: &AppHandle, ev: Value, conn: ipc::Conn) {
+    if ev["hook_event_name"] == "PermissionRequest" {
+        return permission::request(app, ev, conn);
+    }
+    drop(conn);
+    permission::on_event(app, &ev);
+    handle(app, ev);
 }
 
 /// The island side: apply one hook event and tell the UI.

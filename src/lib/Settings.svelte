@@ -286,6 +286,10 @@
         <span>Abrir cuando pide permiso</span>
         {@render toggle(settings.claude_peek, 'Abrir cuando Claude pide permiso', () => set({ claude_peek: !settings.claude_peek }))}
       </div>
+      <div class="row">
+        <span>Responder permisos desde la isla</span>
+        {@render toggle(settings.claude_approve, 'Responder permisos desde la isla', () => set({ claude_approve: !settings.claude_approve }))}
+      </div>
     </section>
     {#if error}<p class="err">{error}</p>{/if}
     <footer class="brand" aria-label="Acerca de">

@@ -17,11 +17,14 @@ export const focus = $state({
 
 // session: the most recently active Claude Code session (or null).
 // hooks: whether the island's hooks are in ~/.claude/settings.json (null = unknown).
-export const claude = $state({ session: null, hooks: null });
+// perms: permission prompts waiting for an answer from the island, oldest first.
+export const claude = $state({ session: null, hooks: null, perms: [] });
 
 export const claudeCmd = {
   hooks: (action) =>
     invoke('claude_hooks', { action }).then((v) => (claude.hooks = v)),
+  // decision: 'allow' | 'always' | 'deny'
+  answer: (id, decision) => invoke('claude_permission', { id, decision }),
 };
 
 // Subagents of the shown session that have not finished yet.
@@ -46,6 +49,7 @@ export const settings = $state({
   break_mins: 5,
   tabs: ['claude', 'music', 'focus', 'notes', 'sys', 'cal'],
   claude_peek: true,
+  claude_approve: true,
   transparency: 0,
   hd_art: false,
   calendars: [],
@@ -65,6 +69,8 @@ export async function init() {
   await listen('settings', (e) => Object.assign(settings, e.payload));
   claude.session = await invoke('claude_snapshot');
   await listen('claude', (e) => (claude.session = e.payload));
+  claude.perms = await invoke('claude_permissions');
+  await listen('claude-perm', (e) => (claude.perms = e.payload));
   claudeCmd.hooks('status').catch(() => (claude.hooks = null));
 
   const snap = await invoke('media_snapshot');

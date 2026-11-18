@@ -4,7 +4,7 @@
 use serde_json::{json, Value};
 use std::{fs, path::PathBuf};
 
-const EVENTS: [(&str, bool); 9] = [
+const EVENTS: [(&str, bool); 10] = [
     // (event, needs a tool matcher)
     ("PreToolUse", true),
     ("PostToolUse", true),
@@ -15,7 +15,24 @@ const EVENTS: [(&str, bool); 9] = [
     ("SessionEnd", false),
     ("SubagentStart", false),
     ("SubagentStop", false),
+    ("PermissionRequest", true),
 ];
+
+/// The one event Claude Code waits on: the hook holds it until the user answers
+/// in the island (or gives up just before this timeout, in seconds). In the
+/// main session the terminal shows its own prompt meanwhile; first answer wins.
+const WAITS: &str = "PermissionRequest";
+const WAIT_TIMEOUT: u64 = 600;
+
+/// The handler for one event.
+fn entry(event: &str, cmd: &str) -> Value {
+    if event == WAITS {
+        json!({ "type": "command", "command": cmd, "timeout": WAIT_TIMEOUT })
+    } else {
+        // async: runs in the background, so Claude never waits on the island.
+        json!({ "type": "command", "command": cmd, "async": true, "timeout": 5 })
+    }
+}
 
 fn settings_path() -> Result<PathBuf, String> {
     let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
@@ -84,8 +101,7 @@ fn rewrite(add: bool) -> Result<(), String> {
         }
         groups.retain(|g| g.get("hooks").and_then(Value::as_array).is_none_or(|l| !l.is_empty()));
         if add {
-            // async: runs in the background, so Claude never waits on the island.
-            let mut group = json!({ "hooks": [{ "type": "command", "command": cmd, "async": true, "timeout": 5 }] });
+            let mut group = json!({ "hooks": [entry(event, &cmd)] });
             if matcher {
                 group["matcher"] = json!("*");
             }
@@ -131,22 +147,27 @@ fn missing_events(settings: &Value) -> bool {
 /// pointing at another existing copy is left alone.
 pub fn repair() {
     let Ok((_, settings)) = load() else { return };
-    let hooks: Vec<&Value> = settings["hooks"]
-        .as_object()
-        .into_iter()
-        .flat_map(|h| h.values())
-        .flat_map(|groups| groups.as_array().into_iter().flatten())
-        .flat_map(|g| g["hooks"].as_array().into_iter().flatten())
-        .filter(|h| is_ours(h))
-        .collect();
-    let stale = hooks.iter().any(|h| {
-        let cmd = h["command"].as_str().unwrap_or("");
-        let path = cmd.split('"').nth(1).unwrap_or("");
-        h["async"] != Value::Bool(true) || path.is_empty() || !std::path::Path::new(path).exists()
-    });
-    if !hooks.is_empty() && (stale || missing_events(&settings)) {
+    if needs_repair(&settings, |p| std::path::Path::new(p).exists()) {
         let _ = install();
     }
+}
+
+fn needs_repair(settings: &Value, exists: impl Fn(&str) -> bool) -> bool {
+    let hooks: Vec<(&String, &Value)> = settings["hooks"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .flat_map(|(event, groups)| groups.as_array().into_iter().flatten().map(move |g| (event, g)))
+        .flat_map(|(event, g)| g["hooks"].as_array().into_iter().flatten().map(move |h| (event, h)))
+        .filter(|(_, h)| is_ours(h))
+        .collect();
+    let stale = hooks.iter().any(|(event, h)| {
+        let cmd = h["command"].as_str().unwrap_or("");
+        let path = cmd.split('"').nth(1).unwrap_or("");
+        let should_wait = event.as_str() == WAITS;
+        (h["async"] == Value::Bool(true)) == should_wait || path.is_empty() || !exists(path)
+    });
+    !hooks.is_empty() && (stale || missing_events(settings))
 }
 
 pub fn installed() -> Result<bool, String> {
@@ -179,6 +200,19 @@ mod tests {
             hooks.insert(event.into(), json!([{ "hooks": [ours()] }]));
         }
         assert!(!missing_events(&json!({ "hooks": hooks })));
+    }
+
+    #[test]
+    fn repair_wants_the_permission_hook_synchronous() {
+        let mut hooks = serde_json::Map::new();
+        for (event, _) in EVENTS {
+            hooks.insert(event.into(), json!([{ "hooks": [entry(event, "\"/opt/island-hook\"")] }]));
+        }
+        let ok = json!({ "hooks": hooks.clone() });
+        assert!(!needs_repair(&ok, |_| true));
+        assert!(needs_repair(&ok, |_| false)); // moved
+        hooks.insert(WAITS.into(), json!([{ "hooks": [ours()] }])); // async: can't answer
+        assert!(needs_repair(&json!({ "hooks": hooks }), |_| true));
     }
 
     #[test]

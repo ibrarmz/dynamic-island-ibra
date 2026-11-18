@@ -70,9 +70,9 @@ fn main() {
 
     // Claim the local channel; if another island owns it, this one isn't needed.
     let serve = || {
-        claude::ipc::serve(|bytes| {
+        claude::ipc::serve(|bytes, conn| {
             if let (Some(app), Ok(ev)) = (APP.get(), serde_json::from_slice(&bytes)) {
-                claude::handle(app, ev);
+                claude::receive(app, ev, conn);
             }
         })
     };
@@ -101,6 +101,7 @@ fn main() {
         .manage(focus::FocusState::default())
         .manage(media::MediaState::default())
         .manage(claude::ClaudeState::default())
+        .manage(claude::permission::PermState::default())
         .manage(sys::SysState::default())
         .manage(calendar::CalState::default())
         .manage(update::UpdateState::default())
@@ -110,6 +111,8 @@ fn main() {
             settings::autostart,
             claude::claude_snapshot,
             claude::claude_hooks,
+            claude::permission::claude_permissions,
+            claude::permission::claude_permission,
             hit::set_hit_rect,
             hit::hover_native,
             hit::release_focus,
@@ -156,6 +159,7 @@ fn main() {
             }
             if !demo {
                 migrate::start(app.handle().clone());
+                claude::permission::start(app.handle().clone());
                 media::start(app.handle().clone());
                 calendar::start(app.handle().clone());
                 update::start(app.handle().clone());

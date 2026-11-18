@@ -29,6 +29,8 @@ pub struct Settings {
     pub tabs: Vec<String>,
     /// Open by itself when Claude asks for permission.
     pub claude_peek: bool,
+    /// Answer Claude Code's permission prompts from the island.
+    pub claude_approve: bool,
     /// How see-through the island's background is, in percent (0 = solid).
     pub transparency: u32,
     /// Look up HD covers in the iTunes catalog (sends artist + title). Opt-in.
@@ -66,6 +68,7 @@ impl Default for Settings {
             break_mins: 5,
             tabs: TABS.iter().map(|s| s.to_string()).collect(),
             claude_peek: true,
+            claude_approve: true,
             transparency: 0,
             hd_art: false,
             calendars: Vec::new(),

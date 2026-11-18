@@ -64,6 +64,8 @@
 
   const playing = $derived(media.track.active && media.track.playing);
   const cStatus = $derived(claude.session?.status);
+  // Claude (or one of its agents) waits for a permission answer.
+  const asking = $derived(cStatus === 'waiting' || !!waitingAgent() || claude.perms.length > 0);
 
   // "Claude terminó" stays in the pill for 10 s after Stop.
   let doneFresh = $state(false);
@@ -83,21 +85,21 @@
   // about to start takes the whole pill (it grows into a card with "Unirse").
   const acts = $derived.by(() => {
     const list = [
-      (cStatus === 'waiting' || waitingAgent()) && 'claude-wait',
+      asking && 'claude-wait',
       cal?.kind === 'alert' && 'cal-alert',
       focus.running && 'focus',
-      cStatus === 'working' && !waitingAgent() && 'claude-work',
+      cStatus === 'working' && !asking && 'claude-work',
       cal?.kind === 'next' && 'cal-next',
       playing && 'music',
       cal?.kind === 'now' && 'cal-now',
-      !waitingAgent() && (doneFresh || (cStatus === 'done' && activeAgents().length > 0)) && 'claude-done',
+      !asking && (doneFresh || (cStatus === 'done' && activeAgents().length > 0)) && 'claude-done',
     ].filter(Boolean);
     return list[0] === 'cal-alert' ? ['cal-alert'] : list.filter((a) => a !== 'cal-alert').slice(0, 2);
   });
   const alert = $derived(!open && acts[0] === 'cal-alert');
   const line = $derived(!open && acts.length === 0);
   // Claude asking for permission must be seen even behind a maximized window.
-  const tucked = $derived(settings.hide_when_covered && !open && covered && cStatus !== 'waiting' && !waitingAgent() && !alert);
+  const tucked = $derived(settings.hide_when_covered && !open && covered && !asking && !alert);
   const pillW = $derived(
     alert ? 460 : acts.length === 2 ? 360 : acts[0] === 'claude-wait' ? 340 : acts[0]?.startsWith('claude') && activeAgents().length ? 380 : 290,
   );
@@ -144,7 +146,7 @@
       ? tab
       : ({ 'claude-wait': 'wait', 'claude-work': 'claude', 'claude-done': 'claude', focus: 'focus', music: 'music', 'cal-alert': 'cal', 'cal-next': 'cal', 'cal-now': 'cal' }[acts[0]] ?? 'idle');
     if (key === 'wait') return ORANGE;
-    if (key === 'claude') return cStatus === 'waiting' || waitingAgent() ? ORANGE : CLAY;
+    if (key === 'claude') return asking ? ORANGE : CLAY;
     if (key === 'focus') return VIOLET;
     if (key === 'notes') return [234, 179, 8];
     if (key === 'sys') return [16, 185, 129];
@@ -178,6 +180,9 @@
       if (alert && cal) {
         tab = 'cal';
         calCmd.dismiss(cal.ev.id);
+      } else if (!open && claude.perms.length) {
+        // Where Permitir / Denegar are.
+        tab = 'claude';
       }
       open = true;
     } else if (state === 'away' && open && !editing) {

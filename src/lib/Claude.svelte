@@ -48,9 +48,60 @@
   const nAgents = $derived(s?.agents?.length ?? 0);
 
   const showDiff = $derived(s?.diff && (s.label === 'EDITANDO' || s.status === 'done' || !s.detail));
+
+  // Oldest prompt the island can answer; the rest wait their turn.
+  const perm = $derived(claude.perms[0]);
+  const more = $derived(claude.perms.length - 1);
+  let answering = $state(0);
+  let permError = $state('');
+  async function answer(decision) {
+    const id = perm.id;
+    answering = id;
+    permError = '';
+    try {
+      await claudeCmd.answer(id, decision);
+    } catch (e) {
+      permError = String(e);
+      setTimeout(() => (permError = ''), 3000);
+    } finally {
+      answering = 0;
+    }
+  }
 </script>
 
-{#if s}
+{#snippet permCard()}
+  <div class="card perm">
+    <div class="perm-h">
+      <span class="pulse sm"></span>
+      <span class="who">{perm.agent ? `AGENTE ${perm.agent}` : 'CLAUDE'} · {perm.action}</span>
+      <span class="ptool">{perm.tool}</span>
+      <span class="sp"></span>
+      {#if more > 0}<span class="more">+{more}</span>{/if}
+      {#if perm.project}<span class="dim">{perm.project}</span>{/if}
+    </div>
+    {#if perm.diff && (perm.diff.removed.length || perm.diff.added.length)}
+      <div class="pfile">{perm.detail}<span><span class="add">+{perm.diff.add}</span>  <span class="del">−{perm.diff.del}</span></span></div>
+      <div class="lines plines">
+        {#each perm.diff.removed as l}<div class="ln del-bg">{l || ' '}</div>{/each}
+        {#each perm.diff.added as l}<div class="ln add-bg">{l || ' '}</div>{/each}
+      </div>
+    {:else}
+      <code class="pcmd" title={perm.detail}><span>{perm.detail || perm.tool}</span></code>
+    {/if}
+    <div class="perm-b">
+      <span class="hint" title={perm.always ? `Siempre permite: ${perm.always}` : ''}>
+        {#if permError}<span class="err">{permError}</span>{:else if perm.always}Siempre: {perm.always}{:else}O responde en la terminal{/if}
+      </span>
+      <button class="pb deny" disabled={answering === perm.id} onclick={() => answer('deny')}>Denegar</button>
+      {#if perm.always}<button class="pb always" disabled={answering === perm.id} onclick={() => answer('always')}>Siempre</button>{/if}
+      <button class="pb allow" disabled={answering === perm.id} onclick={() => answer('allow')}>Permitir</button>
+    </div>
+  </div>
+{/snippet}
+
+{#if !s && perm}
+  <div class="solo">{@render permCard()}</div>
+{:else if s}
   <div class="claude">
     <div class="left">
       <div class="bars {s.status}" aria-hidden="true"><i></i><i></i></div>
@@ -66,7 +117,9 @@
         </div>
       </div>
 
-      {#if s.status === 'waiting'}
+      {#if perm}
+        {@render permCard()}
+      {:else if s.status === 'waiting'}
         <div class="card wait">
           <span class="pulse"></span>
           <span><b>{waitText}</b><br /><span class="dim">Responde en la terminal.</span></span>
@@ -107,7 +160,7 @@
         </div>
       {/if}
 
-      {#if !showAgents}<div class="phases">
+      {#if !showAgents && !perm}<div class="phases">
         {#each PHASES as p, i}
           <div class="ph">
             <div class="track">
@@ -202,6 +255,42 @@
     0% { box-shadow: 0 0 0 0 rgba(255, 154, 85, 0.7); }
     100% { box-shadow: 0 0 0 10px rgba(255, 154, 85, 0); }
   }
+
+  .perm { padding: 10px 12px 10px; display: flex; flex-direction: column; gap: 8px; background: rgba(255, 140, 60, 0.08); box-shadow: inset 0 0 0 1px rgba(255, 154, 85, 0.32); }
+  .perm-h { display: flex; align-items: center; gap: 8px; font-size: 10.5px; letter-spacing: 0.12em; white-space: nowrap; min-width: 0; }
+  .who { color: #ffb585; }
+  .ptool { font-family: var(--mono); letter-spacing: 0.04em; color: var(--fg); overflow: hidden; text-overflow: ellipsis; }
+  .sp { flex: 1; }
+  .more { padding: 1px 6px; border-radius: 6px; background: rgba(255, 154, 85, 0.2); color: #ffb585; letter-spacing: 0.04em; }
+  .perm-h .dim { overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.04em; }
+  .pcmd {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.45;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.35);
+  }
+  /* Clamped inside the padding, so a fourth line never peeks out. */
+  .pcmd span {
+    white-space: pre-wrap;
+    word-break: break-all;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .pfile { display: flex; justify-content: space-between; gap: 10px; font-family: var(--mono); font-size: 11.5px; }
+  .plines { max-height: 50px; border-radius: 8px; background: rgba(0, 0, 0, 0.3); }
+  .perm-b { display: flex; align-items: center; gap: 8px; }
+  .hint { flex: 1; min-width: 0; font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pb { height: 30px; padding: 0 14px; border-radius: 9px; font-family: var(--sans); font-size: 12.5px; font-weight: 600; flex: none; transition: filter 0.15s, background 0.15s; }
+  .pb:hover:not(:disabled) { filter: brightness(1.12); }
+  .allow { background: #fff; color: #141010; }
+  .always { background: rgba(255, 255, 255, 0.1); color: var(--fg); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+  .deny { background: rgba(229, 83, 75, 0.16); color: #ffb0a8; box-shadow: inset 0 0 0 1px rgba(229, 83, 75, 0.35); }
+  .solo { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 40px; }
 
   .agents { border-radius: 12px; background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); overflow: hidden; }
   .arow { display: grid; grid-template-columns: 16px 96px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 12px; }
