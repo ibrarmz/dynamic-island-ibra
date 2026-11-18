@@ -31,6 +31,26 @@
     invoke('monitors_list').then((m) => (monitors = m)).catch(() => {});
   });
 
+  // "Pantalla": a custom list, since the native <select> popup ignores the dark theme.
+  let monitorOpen = $state(false);
+  const monitorOptions = $derived([
+    { key: 'primary', label: 'Principal' },
+    { key: 'cursor', label: 'Donde esté el cursor' },
+    ...monitors.map((m) => {
+      const [name, size] = m.label.split(' · ');
+      return { key: m.key, label: name, sub: [size, m.primary ? 'principal' : ''].filter(Boolean).join(' · ') };
+    }),
+  ]);
+  const monitorChoice = $derived(
+    monitorOptions.find((o) => o.key === settings.monitor) ?? { key: settings.monitor, label: 'Pantalla desconectada' },
+  );
+  // The panel scrolls: bring the whole list into view when it opens.
+  const reveal = (node) => requestAnimationFrame(() => node.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  function pickMonitor(key) {
+    monitorOpen = false;
+    if (key !== settings.monitor) set({ monitor: key });
+  }
+
   // A chosen monitor that is unplugged right now still shows as selected.
   const monitorMissing = $derived(
     settings.monitor !== 'primary' && settings.monitor !== 'cursor' && !monitors.some((m) => m.key === settings.monitor),
@@ -106,19 +126,37 @@
       </div>
       {#if monitors.length > 1 || settings.monitor !== 'primary'}
         <div class="row">
-          <label for="monitor">Pantalla</label>
-          <select id="monitor" value={settings.monitor} onchange={(e) => set({ monitor: e.currentTarget.value })}>
-            <option value="primary">Principal</option>
-            <option value="cursor">Donde esté el cursor</option>
-            {#each monitors as m (m.key)}
-              <option value={m.key}>{m.label}{m.primary ? ' (principal)' : ''}</option>
-            {/each}
-            {#if monitorMissing}<option value={settings.monitor}>Pantalla desconectada</option>{/if}
-          </select>
+          <span id="monitor-label">Pantalla</span>
+          <button
+            class="picker"
+            class:open={monitorOpen}
+            aria-labelledby="monitor-label"
+            aria-expanded={monitorOpen}
+            aria-controls="monitor-options"
+            onclick={() => (monitorOpen = !monitorOpen)}
+          >
+            <span>{monitorChoice.label}</span>{@html icon('chevron', 14, 2)}
+          </button>
         </div>
-        {#if settings.monitor === 'cursor'}
+        {#if monitorOpen}
+          <div id="monitor-options" class="options" role="radiogroup" aria-label="Pantalla de la isla" use:reveal>
+            {#each monitorOptions as o (o.key)}
+              <button
+                role="radio"
+                aria-checked={settings.monitor === o.key}
+                class:on={settings.monitor === o.key}
+                onclick={() => pickMonitor(o.key)}
+              >
+                <span class="tick">{#if settings.monitor === o.key}{@html icon('check', 13, 2.4)}{/if}</span>
+                <span class="opt">{o.label}</span>
+                {#if o.sub}<span class="sub">{o.sub}</span>{/if}
+              </button>
+            {/each}
+          </div>
+        {/if}
+        {#if settings.monitor === 'cursor' && !monitorOpen}
           <p class="hint">Se muda a la pantalla donde dejes el cursor un segundo.</p>
-        {:else if monitorMissing}
+        {:else if monitorMissing && !monitorOpen}
           <p class="hint">Esa pantalla no está conectada: la isla está en la principal hasta que vuelva.</p>
         {/if}
       {/if}
@@ -301,19 +339,28 @@
   .switch.on { background: #6ee7b7; }
   .switch.on i { transform: translateX(16px); }
 
-  select {
+  .picker {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     max-width: 230px;
-    padding: 4px 8px;
-    border: 0;
-    border-radius: 8px;
+    padding: 4px 8px 4px 10px;
+    border-radius: 9px;
     background: rgba(255, 255, 255, 0.08);
-    color: var(--fg);
-    font: inherit;
     font-size: 12px;
-    color-scheme: dark;
-    cursor: pointer;
+    color: var(--fg);
   }
-  select:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.6); outline-offset: 2px; }
+  .picker span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .picker :global(svg) { flex: none; color: var(--dim); transition: transform 0.2s; }
+  .picker.open :global(svg) { transform: rotate(180deg); }
+  .picker:hover { background: rgba(255, 255, 255, 0.14); }
+  .options { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 6px; padding: 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); }
+  .options button { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 4px 10px 4px 6px; border-radius: 8px; text-align: left; font-size: 12.5px; color: var(--dim); }
+  .options button:hover { background: rgba(255, 255, 255, 0.08); color: var(--fg); }
+  .options button.on { color: var(--fg); }
+  .options .tick { width: 14px; display: grid; place-items: center; color: #6ee7b7; flex: none; }
+  .options .opt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .options .sub { flex: none; font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
   .seg { display: flex; padding: 2px; border-radius: 9px; background: rgba(255, 255, 255, 0.08); }
   .seg button { font-size: 11.5px; padding: 4px 8px; border-radius: 7px; color: var(--dim); }
   .seg button.on { background: rgba(255, 255, 255, 0.16); color: var(--fg); }
