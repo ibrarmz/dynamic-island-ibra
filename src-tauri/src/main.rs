@@ -9,6 +9,7 @@ mod hit;
 mod kwin;
 mod media;
 mod migrate;
+mod monitors;
 mod notes;
 mod settings;
 mod sys;
@@ -113,6 +114,7 @@ fn main() {
             hit::hover_native,
             hit::release_focus,
             hit::covered,
+            monitors::monitors_list,
             notes::notes_load,
             notes::notes_save,
             sys::sys_stats,

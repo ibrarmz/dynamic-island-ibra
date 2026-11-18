@@ -37,6 +37,7 @@ export function claudeElapsed() {
 // Mirrors src-tauri/src/settings.rs; the core is the source of truth.
 export const settings = $state({
   position: 'center',
+  monitor: 'primary',
   dwell_idle: 400,
   dwell_busy: 600,
   ghost: true,

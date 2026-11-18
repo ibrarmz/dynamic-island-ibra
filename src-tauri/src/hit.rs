@@ -15,6 +15,10 @@
 //! It also reports `covered` when the foreground window on this monitor is
 //! maximized or fullscreen, so the UI can tuck the island away.
 //!
+//! Which monitor: `settings.monitor` (see monitors.rs). The same loops notice
+//! displays being plugged / unplugged, and in "cursor" mode move the island to
+//! the monitor the cursor has rested on for a second.
+//!
 //! The loop stays cheap: direct syscalls against a cached window origin, and
 //! it only round-trips to the UI thread when a state actually changes.
 
@@ -26,6 +30,7 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+use crate::monitors::{self, Mon};
 use tauri::{Emitter, Manager, PhysicalPosition, WebviewWindow};
 
 /// Must match WIN_W in src/App.svelte.
@@ -48,7 +53,17 @@ pub struct HitState {
     hit: Mutex<Hit>,
     /// Window origin in physical px and its scale factor.
     origin: Mutex<(f64, f64, f64)>,
+    /// Displays as of the last check, the one the island is on, the
+    /// `settings.monitor` value it was placed for, and in "cursor" mode the
+    /// monitor being followed.
+    mons: Mutex<Vec<Mon>>,
+    current: Mutex<String>,
+    mode: Mutex<String>,
+    following: Mutex<Option<String>>,
 }
+
+/// How long the cursor must stay on another monitor before the island follows it.
+const FOLLOW_AFTER: Duration = Duration::from_secs(1);
 
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
@@ -98,22 +113,59 @@ pub fn hover_native() -> bool {
     cfg!(windows)
 }
 
-/// Place the window at the top of the primary monitor (left, centre or right,
+/// Place the window at the top of the chosen monitor (left, centre or right,
 /// per settings) and cache its origin. The UI aligns the island inside it to match.
 pub fn place_window(win: &WebviewWindow) {
-    if let Ok(Some(m)) = win.primary_monitor() {
-        let sf = m.scale_factor();
-        let width = (WIN_W * sf).round() as i32;
-        let margin = (SIDE_MARGIN as f64 * sf).round() as i32;
-        let (mx, mw) = (m.position().x, m.size().width as i32);
-        let x = match crate::settings::get(win.app_handle()).position.as_str() {
-            "left" => mx + margin,
-            "right" => mx + mw - width - margin,
-            _ => mx + (mw - width) / 2,
-        };
-        let y = m.position().y;
-        let _ = win.set_position(PhysicalPosition::new(x, y));
-        *win.state::<HitState>().origin.lock().unwrap() = (x as f64, y as f64, sf);
+    let mons = monitors::snapshot(win);
+    let state = win.state::<HitState>();
+    let settings = crate::settings::get(win.app_handle());
+    let following = state.following.lock().unwrap().clone();
+    let Some(m) = monitors::choose(&mons, &settings.monitor, following.as_deref()).cloned() else { return };
+    let sf = m.scale;
+    let width = (WIN_W * sf).round() as i32;
+    let margin = (SIDE_MARGIN as f64 * sf).round() as i32;
+    let (mx, my, mw, _) = m.rect;
+    let x = match settings.position.as_str() {
+        "left" => mx + margin,
+        "right" => mx + mw - width - margin,
+        _ => mx + (mw - width) / 2,
+    };
+    let _ = win.set_position(PhysicalPosition::new(x, my));
+    *state.origin.lock().unwrap() = (x as f64, my as f64, sf);
+    *state.current.lock().unwrap() = m.key;
+    *state.mode.lock().unwrap() = settings.monitor;
+    *state.mons.lock().unwrap() = mons;
+}
+
+/// Run every few hundred ms by the cursor / covered loops. Every ~2 s: re-place
+/// if displays changed. In "cursor" mode: follow the cursor to another monitor
+/// once it has stayed there FOLLOW_AFTER, but never while the island is open
+/// or the cursor is on it.
+fn monitor_tick(win: &WebviewWindow, tick: u32, every_2s: u32, cursor: Option<(f64, f64)>, pending: &mut Option<(String, Instant)>) {
+    let state = win.state::<HitState>();
+    if tick.is_multiple_of(every_2s) && monitors::snapshot(win) != *state.mons.lock().unwrap() {
+        place_window(win);
+        return;
+    }
+    if *state.mode.lock().unwrap() != monitors::CURSOR || state.hit.lock().unwrap().open {
+        *pending = None;
+        return;
+    }
+    let Some(p) = cursor else { return };
+    let under = state.mons.lock().unwrap().iter().find(|m| m.contains(p)).map(|m| m.key.clone());
+    let current = state.current.lock().unwrap().clone();
+    match under {
+        Some(key) if key != current => match pending {
+            Some((k, since)) if *k == key => {
+                if since.elapsed() >= FOLLOW_AFTER {
+                    *state.following.lock().unwrap() = Some(key);
+                    *pending = None;
+                    place_window(win);
+                }
+            }
+            _ => *pending = Some((key, Instant::now())),
+        },
+        _ => *pending = None,
     }
 }
 
@@ -152,19 +204,29 @@ pub fn start(win: WebviewWindow) {
     {
         platform::watch_leave(&win);
         // Plasma Wayland: KWin sees native Wayland windows, X11 doesn't.
-        if crate::kwin::wanted() && crate::kwin::start(win.clone()) {
-            return;
-        }
+        let kwin = crate::kwin::wanted() && crate::kwin::start(win.clone());
+        watch_covered(win, !kwin);
+        return;
     }
-    watch_covered(win);
+    #[allow(unreachable_code)]
+    watch_covered(win, true);
 }
 
-/// Linux: only the "maximized window in front" check; hover lives in the UI.
-fn watch_covered(win: WebviewWindow) {
+/// Linux: the "maximized window in front" check (unless KWin does it) and the
+/// monitor tick; hover lives in the UI.
+fn watch_covered(win: WebviewWindow, check_covered: bool) {
     thread::spawn(move || {
         let mut covered = false;
+        let mut pending = None;
+        let mut tick: u32 = 0;
         loop {
-            thread::sleep(Duration::from_millis(500));
+            thread::sleep(Duration::from_millis(300));
+            tick = tick.wrapping_add(1);
+            // X11 sees the pointer only over X11 windows on a Wayland session.
+            monitor_tick(&win, tick, 7, platform::cursor(&win), &mut pending);
+            if !check_covered || !tick.is_multiple_of(2) {
+                continue;
+            }
             let (ox, oy, _) = *win.state::<HitState>().origin.lock().unwrap();
             let now = platform::foreground_covers((ox + 10.0, oy + 5.0));
             if now != covered {
@@ -181,6 +243,7 @@ fn track_cursor(win: WebviewWindow) {
         let mut hover = Hover::Away;
         let mut covered = false;
         let mut tick: u32 = 0;
+        let mut pending = None;
         loop {
             thread::sleep(Duration::from_millis(match hover {
                 Hover::Away => 70,
@@ -200,7 +263,12 @@ fn track_cursor(win: WebviewWindow) {
                 }
             }
 
-            let Some((cx, cy)) = platform::cursor(&win) else { continue };
+            let cursor = platform::cursor(&win);
+            if hover == Hover::Away {
+                // ~2 s at the idle 70 ms pace.
+                monitor_tick(&win, tick, 30, cursor, &mut pending);
+            }
+            let Some((cx, cy)) = cursor else { continue };
             let (inside, open, busy) = {
                 let hit = state.hit.lock().unwrap();
                 let (x, y, w, h) = hit.rect;

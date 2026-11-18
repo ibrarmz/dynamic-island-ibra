@@ -14,6 +14,8 @@ pub const TABS: [&str; 6] = ["claude", "music", "focus", "notes", "sys", "cal"];
 pub struct Settings {
     /// "left" | "center" | "right"
     pub position: String,
+    /// "primary" | "cursor" (follows the cursor) | a monitor key (monitors.rs).
+    pub monitor: String,
     /// ms the cursor must rest on the island to open it: idle / something active.
     pub dwell_idle: u32,
     pub dwell_busy: u32,
@@ -55,6 +57,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             position: "center".into(),
+            monitor: crate::monitors::PRIMARY.into(),
             dwell_idle: 400,
             dwell_busy: 600,
             ghost: true,
@@ -80,6 +83,9 @@ impl Settings {
     fn sanitize(mut self) -> Self {
         if !matches!(self.position.as_str(), "left" | "center" | "right") {
             self.position = "center".into();
+        }
+        if self.monitor.trim().is_empty() {
+            self.monitor = crate::monitors::PRIMARY.into();
         }
         self.dwell_idle = self.dwell_idle.clamp(0, 2000);
         self.dwell_busy = self.dwell_busy.clamp(0, 2000);
@@ -173,7 +179,7 @@ pub fn update(app: &AppHandle, patch: Value) -> Result<Settings, String> {
     };
     if before != after {
         save(&state, &after)?;
-        if before.position != after.position {
+        if before.position != after.position || before.monitor != after.monitor {
             if let Some(win) = app.get_webview_window("island") {
                 crate::hit::place_window(&win);
             }

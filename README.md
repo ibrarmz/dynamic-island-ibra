@@ -13,6 +13,7 @@ Una isla dinámica para **Windows y Linux** que vive arriba de tu pantalla: lo q
 - **Claude Code** en vivo: qué fase lleva (leer, editar, probar), el diff que está escribiendo, sus subagentes, y se asoma cuando **pide permiso** o termina.
 - **Calendario** de Google, Outlook o iCloud (link iCal, sin iniciar sesión): tu agenda del día, «Daily en 12 min» en la píldora, aviso un minuto antes y botón **Unirse** a Meet, Zoom o Teams.
 - **Focus** (pomodoro), **notas rápidas** y **sistema** (CPU, memoria, disco, batería).
+- **Varios monitores:** en la pantalla que elijas, o siguiendo al cursor de un monitor a otro.
 - **No estorba:** sin actividad es una línea de 64 px; si el cursor solo pasa, se vuelve transparente y los clics atraviesan; se esconde con ventanas maximizadas.
 - **Ligera y privada:** ~150 MB de RAM, casi 0 % de CPU en reposo, sin cuentas ni servidores propios ([qué se conecta a internet](#privacidad-qué-se-conecta-a-internet)).
 - **Se actualiza sola** con firma verificada.
@@ -80,6 +81,7 @@ Para regrabar el GIF de arriba con datos de ejemplo (sin tu música, calendario 
 
 - **Iniciar con el sistema** (registro de Windows / `~/.config/autostart` en Linux)
 - **Posición:** izquierda, centro o derecha
+- **Pantalla** (con más de un monitor): la principal, una fija (se recuerda por su nombre aunque reconectes cables; si la desconectas, la isla espera en la principal) o **donde esté el cursor**: se muda al monitor donde dejes el cursor un segundo. En Linux con Wayland, "donde esté el cursor" solo ve el cursor sobre apps X11.
 - **Espera para abrir** al pasar el cursor, sin y con actividad (100 ms en 100 ms)
 - **Modo fantasma** y **esconder con ventanas maximizadas**
 - **Focus:** minutos de focus y de descanso (la regla del panel Focus también los guarda)

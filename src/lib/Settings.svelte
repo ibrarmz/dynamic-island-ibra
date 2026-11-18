@@ -23,9 +23,18 @@
   let busy = $state('');
   let error = $state('');
 
+  // Monitors for "Pantalla"; asked once per opening of Ajustes.
+  let monitors = $state([]);
+
   onMount(() => {
     invoke('autostart').then((v) => (autostart = v)).catch(() => (autostart = null));
+    invoke('monitors_list').then((m) => (monitors = m)).catch(() => {});
   });
+
+  // A chosen monitor that is unplugged right now still shows as selected.
+  const monitorMissing = $derived(
+    settings.monitor !== 'primary' && settings.monitor !== 'cursor' && !monitors.some((m) => m.key === settings.monitor),
+  );
 
   async function run(key, fn) {
     busy = key;
@@ -95,6 +104,24 @@
           {/each}
         </span>
       </div>
+      {#if monitors.length > 1 || settings.monitor !== 'primary'}
+        <div class="row">
+          <label for="monitor">Pantalla</label>
+          <select id="monitor" value={settings.monitor} onchange={(e) => set({ monitor: e.currentTarget.value })}>
+            <option value="primary">Principal</option>
+            <option value="cursor">Donde esté el cursor</option>
+            {#each monitors as m (m.key)}
+              <option value={m.key}>{m.label}{m.primary ? ' (principal)' : ''}</option>
+            {/each}
+            {#if monitorMissing}<option value={settings.monitor}>Pantalla desconectada</option>{/if}
+          </select>
+        </div>
+        {#if settings.monitor === 'cursor'}
+          <p class="hint">Se muda a la pantalla donde dejes el cursor un segundo.</p>
+        {:else if monitorMissing}
+          <p class="hint">Esa pantalla no está conectada: la isla está en la principal hasta que vuelva.</p>
+        {/if}
+      {/if}
       <div class="row">
         <span>Transparencia</span>
         <span class="slider">
@@ -274,6 +301,19 @@
   .switch.on { background: #6ee7b7; }
   .switch.on i { transform: translateX(16px); }
 
+  select {
+    max-width: 230px;
+    padding: 4px 8px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--fg);
+    font: inherit;
+    font-size: 12px;
+    color-scheme: dark;
+    cursor: pointer;
+  }
+  select:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.6); outline-offset: 2px; }
   .seg { display: flex; padding: 2px; border-radius: 9px; background: rgba(255, 255, 255, 0.08); }
   .seg button { font-size: 11.5px; padding: 4px 8px; border-radius: 7px; color: var(--dim); }
   .seg button.on { background: rgba(255, 255, 255, 0.16); color: var(--fg); }
