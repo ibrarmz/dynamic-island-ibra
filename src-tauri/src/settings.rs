@@ -46,6 +46,12 @@ pub struct Settings {
     pub cal_only_links: bool,
     /// Look for a newer version on GitHub at startup and every 12 h.
     pub check_updates: bool,
+    /// Show volume / brightness / audio output changes in the pill.
+    pub osd_volume: bool,
+    pub osd_brightness: bool,
+    pub osd_output: bool,
+    /// How long that notice stays, in ms.
+    pub osd_ms: u32,
     /// Which sections this file already knows about. A section added in a later
     /// version is switched on once (files without the field are 0).
     #[serde(default)]
@@ -77,6 +83,10 @@ impl Default for Settings {
             cal_hide_allday: false,
             cal_only_links: false,
             check_updates: true,
+            osd_volume: true,
+            osd_brightness: true,
+            osd_output: true,
+            osd_ms: 1500,
             tabs_v: TABS_V,
         }
     }
@@ -92,6 +102,7 @@ impl Settings {
         }
         self.dwell_idle = self.dwell_idle.clamp(0, 2000);
         self.dwell_busy = self.dwell_busy.clamp(0, 2000);
+        self.osd_ms = self.osd_ms.clamp(500, 5000);
         self.focus_mins = self.focus_mins.clamp(1, 60);
         self.break_mins = self.break_mins.clamp(1, 60);
         // Past 70 % the text loses its backing and becomes hard to read.

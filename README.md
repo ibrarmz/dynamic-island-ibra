@@ -11,6 +11,7 @@ Una isla dinámica para **Windows y Linux** que vive arriba de tu pantalla: lo q
 
 - **Música** de cualquier reproductor (Spotify, YouTube en el navegador, Apple Music, VLC…): carátula, controles y barra de progreso. Opcional: carátulas en HD.
 - **Claude Code** en vivo: qué fase lleva (leer, editar, probar), el diff que está escribiendo, sus subagentes, y se asoma cuando termina. Cuando **pide permiso**, contestas desde la isla: **Permitir**, **Siempre** o **Denegar**, sin volver a la terminal.
+- **Volumen y brillo** estilo Mac: al subir o bajar el volumen, silenciar, cambiar el brillo o conectar audífonos, la píldora lo muestra en lugar del recuadro de Windows. En Sistema → *Sonido y pantalla* hay barras de volumen y brillo y cambias la salida de audio con un clic (Windows).
 - **Calendario** de Google, Outlook o iCloud (link iCal, sin iniciar sesión): tu agenda del día, «Daily en 12 min» en la píldora, aviso un minuto antes y botón **Unirse** a Meet, Zoom o Teams.
 - **Focus** (pomodoro), **notas rápidas** y **sistema** (CPU, memoria, disco, batería).
 - **Varios monitores:** en la pantalla que elijas, o siguiendo al cursor de un monitor a otro.
@@ -86,6 +87,7 @@ Para regrabar el GIF de arriba con datos de ejemplo (sin tu música, calendario 
 - **Modo fantasma** y **esconder con ventanas maximizadas**
 - **Focus:** minutos de focus y de descanso (la regla del panel Focus también los guarda)
 - **Secciones del dock** visibles
+- **Volumen y brillo:** qué avisos salen en la píldora (volumen, brillo, salida de audio) y cuánto duran
 - **Claude Code:** conectar / desconectar, si la isla se abre cuando pide permiso y si puedes contestar permisos desde la isla
 - **Música:** carátulas en HD desde el catálogo de iTunes (apagado por defecto)
 - **Calendario:** conectar calendarios por link iCal y cuándo avisar
@@ -140,6 +142,7 @@ Los hooks de Claude Code usan un canal local (named pipe / socket Unix), nunca l
 | Claude: fases, diff, permisos, terminó | Probado con eventos simulados | Canal y `island-hook` probados en contenedor |
 | Notas: nota rápida con guardado automático, botón **+** del dock | Probado (render) | Compila |
 | Sistema: CPU con historial, memoria, disco, batería, tiempo encendido, RAM de la isla | Probado | Compila |
+| Volumen, silencio, salida de audio y brillo (avisos y controles) | Probado | Aún no |
 | Ajustes, posición, autoarranque | Probado en la app instalada | Compila |
 | Calendario iCal: agenda, avisos, Unirse, conectar copiando el link | Probado con Google (calendario real) | Compila |
 | Actualización automática | Probada de 0.1.13 a 0.1.14 con el instalador `.exe` | Avisa y abre la descarga |

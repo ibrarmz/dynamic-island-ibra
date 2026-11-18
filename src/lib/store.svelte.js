@@ -50,6 +50,10 @@ export const settings = $state({
   tabs: ['claude', 'music', 'focus', 'notes', 'sys', 'cal'],
   claude_peek: true,
   claude_approve: true,
+  osd_volume: true,
+  osd_brightness: true,
+  osd_output: true,
+  osd_ms: 1500,
   transparency: 0,
   hd_art: false,
   calendars: [],
@@ -60,6 +64,18 @@ export const settings = $state({
   check_updates: true,
   tabs_v: 1,
 });
+
+// Volume, mute, outputs and brightness (see src-tauri/src/audio).
+export const audio = $state({ available: false, volume: 0, muted: false, output: '', outputs: [], brightness: null });
+export const audioCmd = {
+  set: (what, value) => invoke('audio_set', { what, value: Math.round(value) }),
+  output: (id) => invoke('audio_output', { id }),
+};
+// The notice in the pill: what changed and until when (ms). Shown by the app.
+export const osd = $state({ kind: null, until: 0 });
+// Sistema panel view: 'equipo' | 'sonido'. The notice opens 'sonido'.
+export const sys = $state({ view: 'equipo' });
+const OSD_SETTING = { volume: 'osd_volume', mute: 'osd_volume', brightness: 'osd_brightness', output: 'osd_output' };
 
 export const setSettings = (patch) =>
   invoke('settings_set', { patch }).then((s) => Object.assign(settings, s));
@@ -72,6 +88,15 @@ export async function init() {
   claude.perms = await invoke('claude_permissions');
   await listen('claude-perm', (e) => (claude.perms = e.payload));
   claudeCmd.hooks('status').catch(() => (claude.hooks = null));
+  Object.assign(audio, await invoke('audio_snapshot'));
+  await listen('audio', (e) => {
+    Object.assign(audio, e.payload.status);
+    const kind = e.payload.cause;
+    if (kind && settings[OSD_SETTING[kind]]) {
+      osd.kind = kind;
+      osd.until = Date.now() + settings.osd_ms;
+    }
+  });
 
   const snap = await invoke('media_snapshot');
   media.track = snap.track;

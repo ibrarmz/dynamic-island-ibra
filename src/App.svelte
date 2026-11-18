@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
-  import { init, media, focus, claude, clock, fmt, setClockSeconds, settings, activeAgents, waitingAgent, calPill, calCmd, update } from './lib/store.svelte.js';
+  import { init, media, focus, claude, clock, fmt, setClockSeconds, settings, activeAgents, waitingAgent, calPill, calCmd, update, audio, osd, sys } from './lib/store.svelte.js';
   import { icon } from './lib/icons.js';
   import Pill from './lib/Pill.svelte';
   import Home from './lib/Home.svelte';
@@ -81,6 +81,17 @@
 
   const cal = $derived(calPill());
 
+  // Volume / brightness / output notice: takes the whole pill for osd_ms.
+  let osdOn = $state(false);
+  $effect(() => {
+    const left = osd.until - Date.now();
+    osdOn = left > 0;
+    if (left > 0) {
+      const t = setTimeout(() => (osdOn = false), left);
+      return () => clearTimeout(t);
+    }
+  });
+
   // What the collapsed pill shows, highest priority first (max two). A meeting
   // about to start takes the whole pill (it grows into a card with "Unirse").
   const acts = $derived.by(() => {
@@ -94,14 +105,17 @@
       cal?.kind === 'now' && 'cal-now',
       !asking && (doneFresh || (cStatus === 'done' && activeAgents().length > 0)) && 'claude-done',
     ].filter(Boolean);
+    if (osdOn) return ['osd'];
     return list[0] === 'cal-alert' ? ['cal-alert'] : list.filter((a) => a !== 'cal-alert').slice(0, 2);
   });
   const alert = $derived(!open && acts[0] === 'cal-alert');
   const line = $derived(!open && acts.length === 0);
   // Claude asking for permission must be seen even behind a maximized window.
-  const tucked = $derived(settings.hide_when_covered && !open && covered && !asking && !alert);
+  const tucked = $derived(settings.hide_when_covered && !open && covered && !asking && !alert && !osdOn);
+  const playingNow = $derived(media.track.active && media.track.playing);
+  const osdW = $derived((osd.kind === 'mute' && audio.muted ? 300 : osd.kind === 'output' ? 360 : 340) + (playingNow ? 40 : 0));
   const pillW = $derived(
-    alert ? 460 : acts.length === 2 ? 360 : acts[0] === 'claude-wait' ? 340 : acts[0]?.startsWith('claude') && activeAgents().length ? 380 : 290,
+    acts[0] === 'osd' ? osdW : alert ? 460 : acts.length === 2 ? 360 : acts[0] === 'claude-wait' ? 340 : acts[0]?.startsWith('claude') && activeAgents().length ? 380 : 290,
   );
   const w = $derived(open ? OPEN.w : line ? LINE.w : pillW);
   const h = $derived(open ? OPEN.h : line ? LINE.h : alert ? ALERT_H : PILL_H);
@@ -142,6 +156,13 @@
   const CLAY = [217, 119, 87];
   const ORANGE = [255, 140, 60];
   const tint = $derived.by(() => {
+    if (!open && acts[0] === 'osd') {
+      if (playingNow && media.art.color) return media.art.color;
+      if (osd.kind === 'mute' && audio.muted) return ORANGE;
+      if (osd.kind === 'brightness') return [245, 200, 75];
+      if (osd.kind === 'output') return [96, 140, 255];
+      return [244, 237, 230];
+    }
     const key = open
       ? tab
       : ({ 'claude-wait': 'wait', 'claude-work': 'claude', 'claude-done': 'claude', focus: 'focus', music: 'music', 'cal-alert': 'cal', 'cal-next': 'cal', 'cal-now': 'cal' }[acts[0]] ?? 'idle');
@@ -180,6 +201,10 @@
       if (alert && cal) {
         tab = 'cal';
         calCmd.dismiss(cal.ev.id);
+      } else if (!open && acts[0] === 'osd' && settings.tabs.includes('sys')) {
+        // Where the sliders and outputs are.
+        tab = 'sys';
+        sys.view = 'sonido';
       } else if (!open && claude.perms.length) {
         // Where Permitir / Denegar are.
         tab = 'claude';

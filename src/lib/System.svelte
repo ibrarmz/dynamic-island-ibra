@@ -2,6 +2,13 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { icon } from './icons.js';
+  import { audio, audioCmd, sys } from './store.svelte.js';
+
+  const hasSound = $derived(audio.available || audio.brightness !== null);
+  const view = $derived(hasSound ? sys.view : 'equipo');
+  const outIcon = (name) => (/aud[ií]fono|headphone|headset|buds|airpods/i.test(name) ? 'headphones' : /hdmi|displayport|monitor|tv/i.test(name) ? 'monitor' : 'speaker');
+  const setVolume = (e) => audioCmd.set('volume', +e.currentTarget.value).catch(() => {});
+  const setBrightness = (e) => audioCmd.set('brightness', +e.currentTarget.value).catch(() => {});
 
   // Measured only while this panel is on screen.
   let stats = $state(null);
@@ -54,6 +61,42 @@
 </script>
 
 <div class="sys">
+  {#if view === 'sonido'}
+  <div class="sound">
+    <div class="sliders">
+      {#if audio.available}
+        <div class="sl">
+          <div class="slh"><label for="vol">Volumen</label><span class="num">{audio.muted ? 'MUTE' : audio.volume}</span></div>
+          <div class="slr">
+            <button class="sq" class:on={audio.muted} aria-label={audio.muted ? 'Quitar silencio' : 'Silenciar'} aria-pressed={audio.muted} onclick={() => audioCmd.set('mute', audio.muted ? 0 : 1)}>
+              {@html icon(audio.muted ? 'mute' : audio.volume < 50 ? 'volLow' : 'vol', 17, 2)}
+            </button>
+            <input id="vol" type="range" min="0" max="100" value={audio.volume} class:muted={audio.muted} style="--p:{audio.volume}%" oninput={setVolume} />
+          </div>
+        </div>
+      {/if}
+      {#if audio.brightness !== null}
+        <div class="sl">
+          <div class="slh"><label for="bri">Brillo</label><span class="num">{audio.brightness}</span></div>
+          <div class="slr">
+            <span class="sq amber" aria-hidden="true">{@html icon('sun', 17, 2)}</span>
+            <input id="bri" type="range" min="0" max="100" value={audio.brightness} class="amber" style="--p:{audio.brightness}%" oninput={setBrightness} />
+          </div>
+        </div>
+      {/if}
+    </div>
+    {#if audio.outputs.length}
+      <div class="outs" role="radiogroup" aria-label="Salida de audio">
+        <span class="label">SALIDA</span>
+        {#each audio.outputs as o (o.id)}
+          <button class="out" class:on={o.default} role="radio" aria-checked={o.default} title={o.name} onclick={() => !o.default && audioCmd.output(o.id)}>
+            {@html icon(outIcon(o.name), 16, 2)}<span>{o.name}</span>{#if o.default}<i class="tick">{@html icon('check', 15, 2.4)}</i>{/if}
+          </button>
+        {/each}
+      </div>
+    {/if}
+  </div>
+  {:else}
   <div class="cards">
     <div class="card">
       <span class="label">CPU</span>
@@ -105,9 +148,19 @@
     </div>
   </div>
 
+  {/if}
+
   <div class="foot">
-    <span>{stats ? `Encendido hace ${uptime(stats.uptime)}` : ''}</span>
-    <span>{islandMb !== null ? `Esta isla usa ${islandMb} MB` : ''}</span>
+    {#if hasSound}
+      <span class="seg" role="tablist" aria-label="Vista">
+        <button role="tab" aria-selected={view === 'equipo'} class:on={view === 'equipo'} onclick={() => (sys.view = 'equipo')}>Equipo</button>
+        <button role="tab" aria-selected={view === 'sonido'} class:on={view === 'sonido'} onclick={() => (sys.view = 'sonido')}>Sonido y pantalla</button>
+      </span>
+    {/if}
+    {#if view === 'equipo'}
+      <span>{stats ? `Encendido hace ${uptime(stats.uptime)}` : ''}</span>
+      <span>{islandMb !== null ? `Esta isla usa ${islandMb} MB` : ''}</span>
+    {/if}
   </div>
 </div>
 
@@ -142,5 +195,39 @@
   .fill.hot { background: #fdba74; }
   .spark { width: 100%; height: 28px; overflow: visible; }
   .spark polyline { fill: none; stroke: #6ee7b7; stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
-  .foot { display: flex; justify-content: space-between; padding: 0 4px; font-size: 11px; color: var(--dim); }
+  .foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 4px; font-size: 11px; color: var(--dim); }
+  .seg { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: rgba(255, 255, 255, 0.06); }
+  .seg button { height: 22px; padding: 0 10px; border-radius: 7px; font-size: 11px; color: var(--dim); }
+  .seg button.on { background: rgba(255, 255, 255, 0.14); color: var(--fg); }
+
+  .sound { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; padding: 4px 6px 0; }
+  .sliders { display: flex; flex-direction: column; justify-content: center; gap: 18px; }
+  .sl { display: flex; flex-direction: column; gap: 8px; }
+  .slh { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--sans); font-size: 13px; font-weight: 600; }
+  .slh .num { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--dim); }
+  .slr { display: flex; align-items: center; gap: 10px; }
+  .sq { width: 36px; height: 36px; flex: none; border-radius: 10px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.1); color: var(--fg); }
+  .sq.on { background: rgba(255, 140, 60, 0.18); color: #ffb585; }
+  .sq.amber { background: rgba(245, 200, 75, 0.12); color: #f5c84b; }
+  input[type='range'] {
+    flex: 1;
+    min-width: 0;
+    height: 10px;
+    margin: 0;
+    appearance: none;
+    border-radius: 5px;
+    background: linear-gradient(to right, var(--fill, #f4ede6) var(--p), rgba(244, 237, 230, 0.16) var(--p));
+    cursor: pointer;
+  }
+  input.muted { --fill: rgba(244, 237, 230, 0.35); }
+  input.amber { --fill: #f5c84b; background: linear-gradient(to right, var(--fill) var(--p), rgba(245, 200, 75, 0.18) var(--p)); }
+  input[type='range']::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5); }
+  input[type='range']:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.5); outline-offset: 3px; }
+  .outs { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; overflow-y: auto; }
+  .outs .label { margin-bottom: 4px; }
+  .out { height: 40px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-radius: 11px; font-family: var(--sans); font-size: 13px; color: rgba(244, 237, 230, 0.8); text-align: left; }
+  .out span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .out:hover { background: rgba(255, 255, 255, 0.06); }
+  .out.on { background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2); color: var(--fg); font-weight: 600; }
+  .tick { display: grid; color: #7bd88f; }
 </style>

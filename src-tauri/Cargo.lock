@@ -1777,6 +1777,7 @@ dependencies = [
  "ureq",
  "webkit2gtk",
  "windows",
+ "windows-core",
  "x11rb",
  "zbus 5.19.0",
 ]

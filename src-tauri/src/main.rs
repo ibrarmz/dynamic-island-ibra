@@ -1,6 +1,7 @@
 // Hide the console window on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod audio;
 mod calendar;
 mod claude;
 mod focus;
@@ -105,6 +106,7 @@ fn main() {
         .manage(sys::SysState::default())
         .manage(calendar::CalState::default())
         .manage(update::UpdateState::default())
+        .manage(audio::AudioState::default())
         .invoke_handler(tauri::generate_handler![
             settings::settings_get,
             settings::settings_set,
@@ -138,6 +140,9 @@ fn main() {
             update::update_status,
             update::update_check,
             update::update_install,
+            audio::audio_snapshot,
+            audio::audio_set,
+            audio::audio_output,
         ])
         .setup(move |app| {
             let _ = APP.set(app.handle().clone());
@@ -163,6 +168,7 @@ fn main() {
                 media::start(app.handle().clone());
                 calendar::start(app.handle().clone());
                 update::start(app.handle().clone());
+                audio::start(app.handle().clone());
             }
 
             // Dev aid: ISLAND_PEEK=home,music,focus opens each panel in turn (for screenshots).

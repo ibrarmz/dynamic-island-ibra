@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { settings, setSettings, claude, claudeCmd, calendar, calCmd, clock, update, updateCmd } from './store.svelte.js';
+  import { settings, setSettings, claude, claudeCmd, calendar, calCmd, clock, update, updateCmd, audio } from './store.svelte.js';
   import { icon } from './icons.js';
   import CalConnect from './CalConnect.svelte';
 
@@ -275,6 +275,22 @@
         {/each}
       </div>
     </section>
+
+    {#if audio.available || audio.brightness !== null}
+      <section>
+        <h3 class="label">VOLUMEN Y BRILLO</h3>
+        {#if audio.available}
+          <div class="row"><span>Mostrar al cambiar el volumen</span>{@render toggle(settings.osd_volume, 'Mostrar al cambiar el volumen', () => set({ osd_volume: !settings.osd_volume }))}</div>
+        {/if}
+        {#if audio.brightness !== null}
+          <div class="row"><span>Mostrar al cambiar el brillo</span>{@render toggle(settings.osd_brightness, 'Mostrar al cambiar el brillo', () => set({ osd_brightness: !settings.osd_brightness }))}</div>
+        {/if}
+        {#if audio.available}
+          <div class="row"><span>Avisar al cambiar la salida de audio</span>{@render toggle(settings.osd_output, 'Avisar al cambiar la salida de audio', () => set({ osd_output: !settings.osd_output }))}</div>
+        {/if}
+        <div class="row"><span>Cerrar el aviso tras</span>{@render stepper('osd_ms', 500, 500, 5000, ' ms', 'Tiempo que se queda el aviso')}</div>
+      </section>
+    {/if}
 
     <section>
       <h3 class="label">CLAUDE CODE</h3>

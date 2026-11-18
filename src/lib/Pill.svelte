@@ -1,5 +1,5 @@
 <script>
-  import { media, claude, claudeElapsed, focusRemaining, fmt, activeAgents, waitingAgent, calPill, calUntil, clock } from './store.svelte.js';
+  import { media, claude, claudeElapsed, focusRemaining, fmt, activeAgents, waitingAgent, calPill, calUntil, clock, audio, osd } from './store.svelte.js';
   import { icon } from './icons.js';
   import Cover from './Cover.svelte';
 
@@ -22,6 +22,10 @@
   );
 
   const cal = $derived(calPill());
+
+  // Volume / brightness / output notice. Unmuting shows the volume again.
+  const osdView = $derived(osd.kind === 'mute' && !audio.muted ? 'volume' : osd.kind);
+  const outIcon = (name) => (/aud[ií]fono|headphone|headset|buds|airpods/i.test(name) ? 'headphones' : /hdmi|displayport|monitor|tv/i.test(name) ? 'monitor' : 'speaker');
   const mins = (ms) => Math.max(1, Math.ceil(ms / 60_000));
 </script>
 
@@ -48,7 +52,26 @@
 {/snippet}
 
 <div class="pill" class:alert={acts[0] === 'cal-alert'}>
-  {#if acts[0] === 'cal-alert' && cal}
+  {#if acts[0] === 'osd'}
+    <span class="osd" class:withcover={media.track.active && media.track.playing}>
+      {#if media.track.active && media.track.playing}<Cover />{/if}
+      {#if osdView === 'mute'}
+        <span class="oico orange">{@html icon('mute', 17, 2)}</span>
+        <span class="olabel">Silenciado</span>
+        <span class="tag orange">MUTE</span>
+      {:else if osdView === 'output'}
+        <span class="oico blue">{@html icon(outIcon(audio.output), 17, 2)}</span>
+        <span class="olabel">{audio.output || 'Salida de audio'}</span>
+        <span class="tag blue">SALIDA</span>
+      {:else}
+        {@const bright = osdView === 'brightness'}
+        {@const value = bright ? (audio.brightness ?? 0) : audio.volume}
+        <span class="oico" class:amber={bright}>{@html icon(bright ? 'sun' : value < 50 ? 'volLow' : 'vol', 17, 2)}</span>
+        <span class="obar" class:amber={bright}><i style="width:{value}%"></i></span>
+        <span class="num oval">{value}</span>
+      {/if}
+    </span>
+  {:else if acts[0] === 'cal-alert' && cal}
     <div class="acard">
       <span class="label violet">{cal.ev.start > clock.now ? `EMPIEZA ${calUntil(cal.ev.start - clock.now).toUpperCase()}` : 'YA EMPEZÓ'}</span>
       <span class="atitle">{cal.ev.title}</span>
@@ -136,6 +159,17 @@
     gap: 8px;
   }
   .cdot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .osd { flex: 1; min-width: 0; display: flex; align-items: center; gap: 11px; padding-left: 8px; }
+  .osd.withcover { padding-left: 0; }
+  .oico { display: grid; flex: none; color: var(--fg); }
+  .amber { color: #f5c84b; }
+  .blue { color: #a9c1ff; }
+  .olabel { flex: 1; min-width: 0; font-family: var(--sans); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .obar { flex: 1; height: 6px; border-radius: 3px; background: rgba(244, 237, 230, 0.18); overflow: hidden; }
+  .obar.amber { background: rgba(245, 200, 75, 0.2); }
+  .obar i { display: block; height: 100%; border-radius: 3px; background: var(--fg); transition: width 0.12s ease-out; }
+  .obar.amber i { background: #f5c84b; }
+  .oval { width: 26px; text-align: right; font-size: 13px; font-weight: 600; }
   .ico { display: grid; flex: none; }
   .dim { color: var(--dim); }
   .nowrap { white-space: nowrap; flex: none; }
