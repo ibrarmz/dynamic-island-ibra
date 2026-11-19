@@ -255,7 +255,9 @@ fn track_cursor(win: WebviewWindow) {
             let (ox, oy, sf) = *state.origin.lock().unwrap();
 
             // Every ~0.5 s: is a maximized / fullscreen window in front?
+            // And are we still above normal windows? (Windows can demote it.)
             if tick % 7 == 0 {
+                platform::keep_on_top(&win);
                 let now_covered = platform::foreground_covers((ox + 10.0, oy + 5.0));
                 if now_covered != covered {
                     covered = now_covered;
@@ -374,6 +376,42 @@ mod platform {
 
     /// True when the foreground window sits on our monitor and is maximized
     /// or fullscreen. The desktop, the taskbar and our own window don't count.
+    /// Windows sometimes drops an always-on-top window below normal windows
+    /// while keeping its WS_EX_TOPMOST flag (seen behind a maximized Windows
+    /// Terminal). Only topmost windows may sit above ours; if a visible normal
+    /// window does, put the island back on top, without taking focus.
+    pub fn keep_on_top(win: &WebviewWindow) {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetWindow, GetWindowLongW, IsWindowVisible, SetWindowPos, GWL_EXSTYLE, GW_HWNDPREV, HWND_TOPMOST,
+            SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, WS_EX_TOPMOST,
+        };
+        let Ok(hwnd) = win.hwnd() else { return };
+        unsafe {
+            let mut above = GetWindow(hwnd, GW_HWNDPREV);
+            // Normally only a handful of topmost windows are above us.
+            for _ in 0..64 {
+                let Ok(h) = above else { return };
+                if h.is_invalid() {
+                    return;
+                }
+                let topmost = GetWindowLongW(h, GWL_EXSTYLE) as u32 & WS_EX_TOPMOST.0 != 0;
+                if !topmost && IsWindowVisible(h).as_bool() {
+                    let _ = SetWindowPos(
+                        hwnd,
+                        Some(HWND_TOPMOST),
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER,
+                    );
+                    return;
+                }
+                above = GetWindow(h, GW_HWNDPREV);
+            }
+        }
+    }
+
     pub fn foreground_covers(island_point: (f64, f64)) -> bool {
         unsafe {
             let fg = GetForegroundWindow();
@@ -530,6 +568,8 @@ mod platform {
             .unwrap_or_default()
     }
 
+    pub fn keep_on_top(_: &WebviewWindow) {}
+
     pub fn foreground_covers(island: (f64, f64)) -> bool {
         let Some(x) = x() else { return false };
         let Some(&active) = prop32(x, x.root, x.atoms._NET_ACTIVE_WINDOW, AtomEnum::WINDOW).first() else {
@@ -573,4 +613,5 @@ mod platform {
     pub fn foreground_covers(_: (f64, f64)) -> bool {
         false
     }
+    pub fn keep_on_top(_: &WebviewWindow) {}
 }
