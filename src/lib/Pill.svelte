@@ -2,24 +2,17 @@
   import { media, claude, claudeElapsed, focusRemaining, fmt, activeAgents, waitingAgent, calPill, calUntil, clock, audio, osd } from './store.svelte.js';
   import { icon } from './icons.js';
   import Cover from './Cover.svelte';
+  import { waitInfo } from './pill.js';
 
   // Highest priority first. One activity: full layout. Two: compact, the top one on the right.
   let { acts } = $props();
 
   // The main session's own permission wins over a subagent's.
   // A prompt the island can answer says exactly who asks and for what.
-  const perm = $derived(claude.perms[0]);
-  const waitAgent = $derived(
-    perm ? (perm.agent ? { kind: perm.agent } : null) : claude.session?.status === 'waiting' ? null : waitingAgent(),
-  );
+  const wait = $derived(waitInfo({ perm: claude.perms[0], session: claude.session, waitingAgent: waitingAgent() }));
+  const waitAgent = $derived(wait.agent);
+  const waitTool = $derived(wait.tool);
   const nAgents = $derived(activeAgents().length);
-  const waitTool = $derived(
-    perm
-      ? perm.tool.toUpperCase()
-      : waitAgent
-      ? (waitAgent.message?.match(/permission to use (\w+)/i)?.[1] ?? 'PERMISO').toUpperCase()
-      : (claude.session?.message?.match(/permission to use (\w+)/i)?.[1] ?? claude.session?.tool ?? '').toUpperCase(),
-  );
 
   const cal = $derived(calPill());
 

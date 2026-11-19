@@ -5,6 +5,7 @@
   import { init, media, focus, claude, clock, fmt, setClockSeconds, settings, activeAgents, waitingAgent, calPill, calCmd, update, audio, osd, sys } from './lib/store.svelte.js';
   import { icon } from './lib/icons.js';
   import Pill from './lib/Pill.svelte';
+  import { pillActs, pillWidth, waitInfo } from './lib/pill.js';
   import Home from './lib/Home.svelte';
   import Claude from './lib/Claude.svelte';
   import Music from './lib/Music.svelte';
@@ -94,30 +95,17 @@
 
   // What the collapsed pill shows, highest priority first (max two). A meeting
   // about to start takes the whole pill (it grows into a card with "Unirse").
-  const acts = $derived.by(() => {
-    const list = [
-      asking && 'claude-wait',
-      cal?.kind === 'alert' && 'cal-alert',
-      focus.running && 'focus',
-      cStatus === 'working' && !asking && 'claude-work',
-      cal?.kind === 'next' && 'cal-next',
-      playing && 'music',
-      cal?.kind === 'now' && 'cal-now',
-      !asking && (doneFresh || (cStatus === 'done' && activeAgents().length > 0)) && 'claude-done',
-    ].filter(Boolean);
-    if (osdOn) return ['osd'];
-    return list[0] === 'cal-alert' ? ['cal-alert'] : list.filter((a) => a !== 'cal-alert').slice(0, 2);
-  });
+  const acts = $derived(
+    pillActs({ asking, cal, focusRunning: focus.running, claudeStatus: cStatus, playing, doneFresh, agentsActive: activeAgents().length, osdOn }),
+  );
   const alert = $derived(!open && acts[0] === 'cal-alert');
   const line = $derived(!open && acts.length === 0);
   // Claude asking for permission must be seen even behind a maximized window.
   const tucked = $derived(settings.hide_when_covered && !open && covered && !asking && !alert && !osdOn);
-  const playingNow = $derived(media.track.active && media.track.playing);
   // A subagent asking names itself ("Agente general-purpose pide permiso"): needs more room.
-  const agentAsks = $derived(claude.perms[0] ? !!claude.perms[0].agent : claude.session?.status !== 'waiting' && !!waitingAgent()?.kind);
-  const osdW = $derived((osd.kind === 'mute' && audio.muted ? 300 : osd.kind === 'output' ? 360 : 340) + (playingNow ? 40 : 0));
+  const agentAsks = $derived(!!waitInfo({ perm: claude.perms[0], session: claude.session, waitingAgent: waitingAgent() }).agent?.kind);
   const pillW = $derived(
-    acts[0] === 'osd' ? osdW : alert ? 460 : acts.length === 2 ? 360 : acts[0] === 'claude-wait' ? (agentAsks ? 440 : 340) : acts[0]?.startsWith('claude') && activeAgents().length ? 380 : 290,
+    pillWidth({ acts, osd: { kind: osd.kind, muted: audio.muted, playing }, agentAsks, agentsActive: activeAgents().length }),
   );
   const w = $derived(open ? OPEN.w : line ? LINE.w : pillW);
   const h = $derived(open ? OPEN.h : line ? LINE.h : alert ? ALERT_H : PILL_H);
@@ -159,7 +147,7 @@
   const ORANGE = [255, 140, 60];
   const tint = $derived.by(() => {
     if (!open && acts[0] === 'osd') {
-      if (playingNow && media.art.color) return media.art.color;
+      if (playing && media.art.color) return media.art.color;
       if (osd.kind === 'mute' && audio.muted) return ORANGE;
       if (osd.kind === 'brightness') return [245, 200, 75];
       if (osd.kind === 'output') return [96, 140, 255];
