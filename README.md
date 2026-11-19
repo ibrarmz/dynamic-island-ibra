@@ -1,6 +1,13 @@
 <h1 align="center">IBRÆ</h1>
 <p align="center"><em>A different layer of your desktop.</em><br><sub>DESIGNED BY IBRA · EST. 2026</sub></p>
 
+<p align="center">
+  <a href="https://github.com/ibrarmz/ibrae/releases/latest"><img alt="Descargar" src="https://img.shields.io/github/v/release/ibrarmz/ibrae?style=for-the-badge&label=Descargar&color=e07a5f"></a>
+  <a href="https://github.com/sponsors/ibrarmz"><img alt="Apoyar en GitHub Sponsors" src="https://img.shields.io/badge/Apoyar-GitHub%20Sponsors-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white"></a>
+  <a href="https://github.com/ibrarmz/ibrae/stargazers"><img alt="Estrellas" src="https://img.shields.io/github/stars/ibrarmz/ibrae?style=for-the-badge&color=f5c84b"></a>
+  <a href="LICENSE"><img alt="Licencia MIT" src="https://img.shields.io/badge/licencia-MIT-8fd6a0?style=for-the-badge"></a>
+</p>
+
 Una isla dinámica para **Windows y Linux** que vive arriba de tu pantalla: lo que suena, lo que hace Claude Code, tu próxima reunión y tus herramientas del día, a un vistazo. Gratis y de código abierto.
 
 <p align="center"><img src="docs/demo.gif" alt="La isla: música en la píldora, Claude Code trabajando y pidiendo permiso, aviso de reunión y los paneles de música, Claude y calendario" width="760"></p>
