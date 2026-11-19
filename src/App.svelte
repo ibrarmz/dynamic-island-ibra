@@ -113,9 +113,11 @@
   // Claude asking for permission must be seen even behind a maximized window.
   const tucked = $derived(settings.hide_when_covered && !open && covered && !asking && !alert && !osdOn);
   const playingNow = $derived(media.track.active && media.track.playing);
+  // A subagent asking names itself ("Agente general-purpose pide permiso"): needs more room.
+  const agentAsks = $derived(claude.perms[0] ? !!claude.perms[0].agent : claude.session?.status !== 'waiting' && !!waitingAgent()?.kind);
   const osdW = $derived((osd.kind === 'mute' && audio.muted ? 300 : osd.kind === 'output' ? 360 : 340) + (playingNow ? 40 : 0));
   const pillW = $derived(
-    acts[0] === 'osd' ? osdW : alert ? 460 : acts.length === 2 ? 360 : acts[0] === 'claude-wait' ? 340 : acts[0]?.startsWith('claude') && activeAgents().length ? 380 : 290,
+    acts[0] === 'osd' ? osdW : alert ? 460 : acts.length === 2 ? 360 : acts[0] === 'claude-wait' ? (agentAsks ? 440 : 340) : acts[0]?.startsWith('claude') && activeAgents().length ? 380 : 290,
   );
   const w = $derived(open ? OPEN.w : line ? LINE.w : pillW);
   const h = $derived(open ? OPEN.h : line ? LINE.h : alert ? ALERT_H : PILL_H);

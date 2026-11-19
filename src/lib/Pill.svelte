@@ -105,7 +105,7 @@
     {/if}
   {:else if acts[0] === 'claude-wait'}
     <span class="row pad"><span class="pulse"></span><span class="msg">{#if waitAgent}{#if waitAgent.kind}Agente <span class="clay">{waitAgent.kind}</span> pide permiso{:else}Un agente pide permiso{/if}{:else}Claude pide permiso{/if}</span></span>
-    <span class="tag orange">{waitTool}</span>
+    <span class="tag orange nowrap">{waitTool}</span>
   {:else if (acts[0] === 'cal-next' || acts[0] === 'cal-now') && cal}
     <span class="row pad" title={cal.ev.title}>
       {#if acts[0] === 'cal-next'}
@@ -181,7 +181,7 @@
   .orange { color: #ffb585; }
   .fg { color: var(--fg); font-size: 13px; }
   .tag { font-size: 11px; letter-spacing: 0.12em; white-space: nowrap; }
-  .msg { font-size: 11.5px; white-space: nowrap; }
+  .msg { font-size: 11.5px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .big { font-size: 13px; }
   .song {
     min-width: 0;
@@ -222,6 +222,7 @@
 
   .pulse {
     display: block;
+    flex: none;
     width: 9px;
     height: 9px;
     border-radius: 50%;
