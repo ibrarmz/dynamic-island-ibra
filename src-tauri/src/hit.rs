@@ -143,7 +143,7 @@ pub fn place_window(win: &WebviewWindow) {
 /// or the cursor is on it.
 fn monitor_tick(win: &WebviewWindow, tick: u32, every_2s: u32, cursor: Option<(f64, f64)>, pending: &mut Option<(String, Instant)>) {
     let state = win.state::<HitState>();
-    if tick.is_multiple_of(every_2s) && monitors::snapshot(win) != *state.mons.lock().unwrap() {
+    if tick.is_multiple_of(every_2s) && (monitors::snapshot(win) != *state.mons.lock().unwrap() || moved_by_os(win)) {
         place_window(win);
         return;
     }
@@ -167,6 +167,25 @@ fn monitor_tick(win: &WebviewWindow, tick: u32, every_2s: u32, cursor: Option<(f
         },
         _ => *pending = None,
     }
+}
+
+/// Windows 11 puts windows back on a monitor when it is plugged in again
+/// ("remember window locations"), a few seconds after we placed the island.
+/// Hover is tested against the cached origin, so a window moved under us
+/// opens on one monitor while it shows on the other: re-place it.
+#[cfg(windows)]
+fn moved_by_os(win: &WebviewWindow) -> bool {
+    let (ox, oy, _) = *win.state::<HitState>().origin.lock().unwrap();
+    win.outer_position()
+        .map(|p| (p.x as f64 - ox).abs() > 2.0 || (p.y as f64 - oy).abs() > 2.0)
+        .unwrap_or(false)
+}
+
+/// Window managers on Linux may keep the window off our exact position on
+/// purpose (KWin pins it over a top panel), so this check is Windows-only.
+#[cfg(not(windows))]
+fn moved_by_os(_: &WebviewWindow) -> bool {
+    false
 }
 
 #[derive(Clone, Copy, PartialEq)]
