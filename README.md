@@ -8,9 +8,9 @@
   <a href="LICENSE"><img alt="Licencia MIT" src="https://img.shields.io/badge/licencia-MIT-8fd6a0?style=for-the-badge"></a>
 </p>
 
-Una isla dinámica para **Windows y Linux** que vive arriba de tu pantalla: lo que suena, lo que hace Claude Code, tu próxima reunión y tus herramientas del día, a un vistazo. Gratis y de código abierto.
+https://github.com/user-attachments/assets/b2391a25-c06f-46eb-bb2a-e74e7af3be1c
 
-<p align="center"><img src="docs/demo.gif" alt="La isla: música en la píldora, Claude Code trabajando y pidiendo permiso, aviso de reunión y los paneles de música, Claude y calendario" width="760"></p>
+Una isla dinámica para **Windows y Linux** que vive arriba de tu pantalla: lo que suena, lo que hace Claude Code, tu próxima reunión y tus herramientas del día, a un vistazo. Gratis y de código abierto.
 
 **[Descargar la última versión](https://github.com/ibrarmz/ibrae/releases/latest)** · Windows 10/11, Debian/Ubuntu, Fedora · [♥ Apoyar](https://github.com/sponsors/ibrarmz)
 
@@ -25,6 +25,8 @@ Una isla dinámica para **Windows y Linux** que vive arriba de tu pantalla: lo q
 - **No estorba:** sin actividad es una línea de 64 px; si el cursor solo pasa, se vuelve transparente y los clics atraviesan; se esconde con ventanas maximizadas.
 - **Ligera y privada:** ~150 MB de RAM, casi 0 % de CPU en reposo, sin cuentas ni servidores propios ([qué se conecta a internet](#privacidad-qué-se-conecta-a-internet)).
 - **Se actualiza sola** con firma verificada.
+
+<p align="center"><img src="docs/demo.gif" alt="La isla: música en la píldora, Claude Code trabajando y pidiendo permiso, aviso de reunión y los paneles de música, Claude y calendario" width="760"></p>
 
 Hecha con **Tauri 2 + Rust + Svelte 5**. El nombre se escribe IBRÆ y se busca como *ibrae*.
 
