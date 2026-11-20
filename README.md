@@ -1,6 +1,8 @@
 <h1 align="center">IBRÆ</h1>
 <p align="center"><em>A different layer of your desktop.</em><br><sub>DESIGNED BY IBRA · EST. 2026</sub></p>
 
+<p align="center"><b>Español</b> · <a href="README.en.md">English</a></p>
+
 <p align="center">
   <a href="https://github.com/ibrarmz/ibrae/releases/latest"><img alt="Descargar" src="https://img.shields.io/github/v/release/ibrarmz/ibrae?style=for-the-badge&label=Descargar&color=e07a5f"></a>
   <a href="https://github.com/sponsors/ibrarmz"><img alt="Apoyar en GitHub Sponsors" src="https://img.shields.io/badge/Apoyar-GitHub%20Sponsors-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white"></a>
