@@ -10,7 +10,7 @@
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-8fd6a0?style=for-the-badge"></a>
 </p>
 
-https://github.com/user-attachments/assets/b2391a25-c06f-46eb-bb2a-e74e7af3be1c
+https://github.com/user-attachments/assets/9225234e-9b3e-475a-bcdc-e772a08a3817
 
 A dynamic island for **Windows and Linux** that lives at the top of your screen: what's playing, what Claude Code is doing, your next meeting and your everyday tools, at a glance. Free and open source.
 
